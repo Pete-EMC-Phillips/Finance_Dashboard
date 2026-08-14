@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S&S ISA Growth Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1a17;
+    --panel:#152622;
+    --panel-2:#1b302a;
+    --border:#264a40;
+    --text:#eaf5f0;
+    --muted:#9db8ae;
+    --accent:#2fd6a7;
+    --accent-2:#4aa8ff;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #163a30 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  header h1{
+    font-size:1.7rem;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .badge{
+    display:inline-flex;align-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#08221b;
+    font-weight:700;font-size:0.75rem;
+    padding:3px 10px;border-radius:100px;
+    letter-spacing:0.02em;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width: 920px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--text);
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  label{
+    display:block;
+    font-size:0.82rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:16px;}
+  input[type="number"], input[type="month"], input[type="text"]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+  }
+  input[type="number"]:focus, input[type="month"]:focus{
+    border-color:var(--accent);
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .slider-row{
+    display:flex;align-items:center;gap:12px;
+  }
+  input[type="range"]{
+    flex:1;
+    -webkit-appearance:none;
+    height:6px;
+    border-radius:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px;height:18px;border-radius:50%;
+    background:#fff;
+    border:3px solid var(--accent-2);
+    cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:18px;height:18px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent-2);cursor:pointer;
+  }
+  .slider-val{
+    min-width:56px;text-align:right;
+    font-weight:700;font-size:1rem;
+    color:var(--accent);
+  }
+  .years-val{color:var(--accent-2);}
+  .sublist{
+    display:flex;flex-direction:column;gap:8px;
+    margin-top:10px;
+  }
+  .sublist-item{
+    display:flex;align-items:center;gap:8px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:8px 10px;
+    font-size:0.85rem;
+  }
+  .sublist-item .meta{flex:1;}
+  .sublist-item .meta b{color:var(--text);}
+  .sublist-item .meta span{color:var(--muted);display:block;font-size:0.78rem;}
+  .remove-btn{
+    background:none;border:none;color:var(--danger);
+    cursor:pointer;font-size:1.1rem;line-height:1;
+    padding:2px 6px;border-radius:6px;
+  }
+  .remove-btn:hover{background:rgba(255,107,107,0.15);}
+  .add-form{
+    display:grid;grid-template-columns:1.3fr 0.9fr 1fr auto;gap:8px;
+    margin-top:12px;align-items:end;
+  }
+  .add-form label{margin-bottom:4px;}
+  .add-form > div{min-width:0;}
+  .month-year{
+    display:grid;grid-template-columns:1.3fr 0.9fr;gap:8px;
+  }
+  .month-year > *{min-width:0;}
+  select{
+    -webkit-appearance:menulist;
+    appearance:menulist;
+    width:100%;
+    min-width:0;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+    cursor:pointer;
+  }
+  select:focus{border-color:var(--accent);}
+  button.add-btn{
+    background:var(--accent);
+    color:#08221b;
+    border:none;font-weight:700;
+    padding:9px 14px;border-radius:9px;
+    cursor:pointer;font-size:0.85rem;
+    white-space:nowrap;
+  }
+  button.add-btn:hover{filter:brightness(1.08);}
+  .empty-note{color:var(--muted);font-size:0.82rem;font-style:italic;}
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 760px){
+    .summary-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+  }
+  .stat .label{color:var(--muted);font-size:0.78rem;margin-bottom:6px;}
+  .stat .value{font-size:1.35rem;font-weight:700;}
+  .stat.pos .value{color:var(--accent);}
+  .stat.neu .value{color:var(--accent-2);}
+  .chart-card canvas{max-height:340px;}
+  .charts-row{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:18px;
+  }
+  @media (max-width: 920px){
+    .charts-row{grid-template-columns:1fr;}
+  }
+  .warning{
+    background:rgba(255,180,84,0.12);
+    border:1px solid rgba(255,180,84,0.4);
+    color:var(--warn);
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:0.82rem;
+    margin-bottom:14px;
+  }
+  .save-note{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;flex-wrap:wrap;
+    color:var(--muted);
+    font-size:0.78rem;
+    margin-top:20px;
+  }
+  .save-note button, .save-note .file-btn{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:0.78rem;
+    display:inline-block;
+  }
+  .save-note button:hover, .save-note .file-btn:hover{color:var(--danger);border-color:var(--danger);}
+  footer{
+    text-align:center;color:var(--muted);
+    font-size:0.78rem;margin-top:20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand-logo" style="margin-bottom:14px;">
+      <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
+        <path d="M20 60 L43 38 L66 60" fill="none" stroke="#96a2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="27" y="60" width="32" height="18" fill="none" stroke="#96a2b8" stroke-width="2.5"/>
+        <path d="M18 70 L32 58 L44 66 L60 44" fill="none" stroke="#2fd6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="60" cy="44" r="3.5" fill="#2fd6a7"/>
+        <text x="97" y="52" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="30" font-weight="700" fill="#eaeef4">Phillips<tspan fill="#4fc3f7"> Finance</tspan></text>
+        <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
+      </svg>
+    </div>
+    <h1>🌱 S&amp;S ISA Growth Tracker <span class="badge">10-year projection</span></h1>
+    <p>Model how your Stocks &amp; Shares ISA could grow with regular contributions, one-off lump sums, and future top-ups.</p>
+  </header>
+
+  <div class="layout">
+    <!-- CONTROLS -->
+    <div>
+      <div class="card">
+        <h2><span class="dot"></span>Starting point</h2>
+        <div class="field">
+          <label>Start month</label>
+          <div class="month-year">
+            <select id="startMonth"></select>
+            <input type="number" id="startYear" min="2000" max="2100" step="1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="startingBalance">Current ISA balance (£)</label>
+            <input type="number" id="startingBalance" value="150" min="0" step="10">
+          </div>
+          <div class="field">
+            <label for="baseMonthly">Monthly contribution (£)</label>
+            <input type="number" id="baseMonthly" value="150" min="0" step="10">
+          </div>
+        </div>
+        <div class="field">
+          <label for="years">Projection length: <span class="years-val" id="yearsVal">10 years</span></label>
+          <input type="range" id="years" min="1" max="15" step="1" value="10">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="growth">Assumed annual growth rate</label>
+          <div class="slider-row">
+            <input type="range" id="growth" min="2" max="10" step="0.1" value="6">
+            <div class="slider-val" id="growthVal">6.0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot" style="background:var(--accent-2)"></span>One-off lump sums</h2>
+        <div id="lumpList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>Month</label>
+            <select id="lumpMonth"></select>
+          </div>
+          <div>
+            <label>Year</label>
+            <input type="number" id="lumpYear" min="2000" max="2100" step="1">
+          </div>
+          <div>
+            <label>Amount (£)</label>
+            <input type="number" id="lumpAmount" placeholder="e.g. 1000" min="1" step="10">
+          </div>
+          <button class="add-btn" id="addLump" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot" style="background:var(--accent-2)"></span>Future monthly top-ups</h2>
+        <div id="increaseList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>From month</label>
+            <select id="incMonth"></select>
+          </div>
+          <div>
+            <label>Year</label>
+            <input type="number" id="incYear" min="2000" max="2100" step="1">
+          </div>
+          <div>
+            <label>New monthly (£)</label>
+            <input type="number" id="incAmount" placeholder="e.g. 250" min="1" step="10">
+          </div>
+          <button class="add-btn" id="addIncrease" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="save-note">
+        <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+        <span style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+          <button id="exportData" type="button">⬇ Export summary</button>
+          <button id="clearSaved" type="button">Reset to defaults</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div>
+      <div id="allowanceWarning" class="warning" style="display:none;"></div>
+
+      <div class="summary-grid">
+        <div class="stat pos">
+          <div class="label">Projected final balance</div>
+          <div class="value" id="statFinal">£0</div>
+        </div>
+        <div class="stat neu">
+          <div class="label">Total paid in</div>
+          <div class="value" id="statContrib">£0</div>
+        </div>
+        <div class="stat pos">
+          <div class="label">Investment growth</div>
+          <div class="value" id="statGrowth">£0</div>
+        </div>
+        <div class="stat neu">
+          <div class="label">Final monthly contribution</div>
+          <div class="value" id="statMonthly">£0</div>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Portfolio growth over time</h2>
+        <canvas id="growthChart"></canvas>
+      </div>
+
+      <div class="charts-row">
+        <div class="card chart-card">
+          <h2><span class="dot" style="background:var(--accent-2)"></span>Contributions vs. growth by year</h2>
+          <canvas id="barChart"></canvas>
+        </div>
+        <div class="card chart-card">
+          <h2><span class="dot" style="background:var(--warn)"></span>Final breakdown</h2>
+          <canvas id="doughnutChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Illustrative only — not financial advice. Assumes constant monthly compounding at the selected growth rate; real markets fluctuate. UK ISA allowance shown is the current £20,000/tax year limit, checked approximately on a rolling 12-month basis.</footer>
+</div>
+
+<script>
+(function(){
+  // ---------- persistence ----------
+  const STORAGE_KEY = 'isaTracker.state.v1';
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function buildState(){
+    return {
+      startMonth: $('startMonth').value,
+      startYear: $('startYear').value,
+      startingBalance: $('startingBalance').value,
+      baseMonthly: $('baseMonthly').value,
+      years: $('years').value,
+      growth: $('growth').value,
+      lumpSums: lumpSums,
+      increases: increases
+    };
+  }
+
+  function saveNow(){
+    try{
+      const state = buildState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const status = $('saveStatus');
+      if(status){
+        status.textContent = 'Saved just now in this browser.';
+        clearTimeout(saveNow._t);
+        saveNow._t = setTimeout(() => {
+          status.textContent = 'Your inputs are saved automatically in this browser.';
+        }, 1500);
+      }
+    }catch(e){
+      // localStorage unavailable (e.g. private browsing) — fail silently
+    }
+  }
+
+  // ---------- state ----------
+  let lumpSums = [];     // { month: 'YYYY-MM', amount: number }
+  let increases = [];    // { month: 'YYYY-MM', amount: number }
+  let lastResults = {};  // populated at the end of compute(), read by the export button
+
+  function downloadJSON(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const $ = id => document.getElementById(id);
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function populateMonthSelect(sel){
+    sel.innerHTML = MONTH_NAMES.map((name, i) =>
+      `<option value="${String(i+1).padStart(2,'0')}">${name}</option>`
+    ).join('');
+  }
+  ['startMonth','lumpMonth','incMonth'].forEach(id => populateMonthSelect($(id)));
+
+  function defaultStartMonth(){
+    const d = new Date();
+    return {month: String(d.getMonth()+1).padStart(2,'0'), year: d.getFullYear()};
+  }
+  const nowDefault = defaultStartMonth();
+
+  // apply a state object (from localStorage or an imported file) to every field
+  function applyState(state){
+    state = state || {};
+    $('startMonth').value = state.startMonth || nowDefault.month;
+    $('startYear').value = state.startYear || nowDefault.year;
+    $('startingBalance').value = state.startingBalance != null ? state.startingBalance : 150;
+    $('baseMonthly').value = state.baseMonthly != null ? state.baseMonthly : 150;
+    $('years').value = state.years || 10;
+    $('growth').value = state.growth != null ? state.growth : 6;
+    lumpSums = Array.isArray(state.lumpSums) ? state.lumpSums : [];
+    increases = Array.isArray(state.increases) ? state.increases : [];
+    renderLumpList();
+    renderIncreaseList();
+  }
+
+  // apply saved state (if any) before first compute
+  const saved = loadSaved();
+  applyState(saved);
+
+  $('lumpMonth').value = nowDefault.month;
+  $('lumpYear').value = nowDefault.year;
+  $('incMonth').value = nowDefault.month;
+  $('incYear').value = nowDefault.year;
+
+  function readYM(monthSelId, yearInputId){
+    const month = $(monthSelId).value;
+    const year = parseInt($(yearInputId).value, 10);
+    if(!month || !year || isNaN(year)) return null;
+    return year + '-' + month;
+  }
+
+  function monthOffset(fromYM, toYM){
+    const [fy, fm] = fromYM.split('-').map(Number);
+    const [ty, tm] = toYM.split('-').map(Number);
+    return (ty - fy) * 12 + (tm - fm);
+  }
+
+  function fmtMonth(ym){
+    const [y,m] = ym.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString('en-GB', {month:'short', year:'numeric'});
+  }
+
+  function gbp(n){
+    return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits:0});
+  }
+
+  // ---------- chart instances ----------
+  let growthChart, barChart, doughnutChart;
+
+  const chartTextColor = '#9db8ae';
+  const gridColor = 'rgba(255,255,255,0.06)';
+
+  Chart.defaults.color = chartTextColor;
+  Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+
+  function initCharts(){
+    const gctx = $('growthChart').getContext('2d');
+    growthChart = new Chart(gctx, {
+      type:'line',
+      data:{labels:[], datasets:[
+        {
+          label:'Portfolio value',
+          data:[],
+          borderColor:'#2fd6a7',
+          backgroundColor:'rgba(47,214,167,0.18)',
+          fill:true,
+          tension:0.3,
+          pointRadius:0,
+          borderWidth:2.5
+        },
+        {
+          label:'Total paid in',
+          data:[],
+          borderColor:'#4aa8ff',
+          backgroundColor:'rgba(74,168,255,0.08)',
+          fill:true,
+          tension:0.15,
+          pointRadius:0,
+          borderWidth:2,
+          borderDash:[5,4]
+        }
+      ]},
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, ticks:{maxTicksLimit:10}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}}
+        }
+      }
+    });
+
+    const bctx = $('barChart').getContext('2d');
+    barChart = new Chart(bctx, {
+      type:'bar',
+      data:{labels:[], datasets:[
+        {label:'Contributed', data:[], backgroundColor:'#4aa8ff', borderRadius:4, stack:'s'},
+        {label:'Growth', data:[], backgroundColor:'#2fd6a7', borderRadius:4, stack:'s'}
+      ]},
+      options:{
+        responsive:true,
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+        },
+        scales:{
+          x:{stacked:true, grid:{display:false}},
+          y:{stacked:true, grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}}
+        }
+      }
+    });
+
+    const dctx = $('doughnutChart').getContext('2d');
+    doughnutChart = new Chart(dctx, {
+      type:'doughnut',
+      data:{labels:['Contributed','Growth'], datasets:[{
+        data:[0,0],
+        backgroundColor:['#4aa8ff','#2fd6a7'],
+        borderColor:'#152622',
+        borderWidth:3
+      }]},
+      options:{
+        responsive:true,
+        plugins:{
+          legend:{position:'bottom', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.label + ': ' + gbp(ctx.parsed)}}
+        },
+        cutout:'65%'
+      }
+    });
+  }
+
+  // ---------- render sublists ----------
+  function renderLumpList(){
+    const el = $('lumpList');
+    if(lumpSums.length === 0){
+      el.innerHTML = '<div class="empty-note">No lump sums added yet.</div>';
+      return;
+    }
+    el.innerHTML = lumpSums
+      .slice()
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map((l, idx) => {
+        const realIdx = lumpSums.indexOf(l);
+        return `<div class="sublist-item">
+          <div class="meta"><b>${gbp(l.amount)}</b><span>${fmtMonth(l.month)}</span></div>
+          <button class="remove-btn" data-type="lump" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  function renderIncreaseList(){
+    const el = $('increaseList');
+    if(increases.length === 0){
+      el.innerHTML = '<div class="empty-note">No future top-ups scheduled.</div>';
+      return;
+    }
+    el.innerHTML = increases
+      .slice()
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map((inc) => {
+        const realIdx = increases.indexOf(inc);
+        return `<div class="sublist-item">
+          <div class="meta"><b>${gbp(inc.amount)}/mo</b><span>from ${fmtMonth(inc.month)}</span></div>
+          <button class="remove-btn" data-type="inc" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-btn');
+    if(!btn) return;
+    const idx = Number(btn.dataset.idx);
+    if(btn.dataset.type === 'lump'){
+      lumpSums.splice(idx,1);
+      renderLumpList();
+    } else {
+      increases.splice(idx,1);
+      renderIncreaseList();
+    }
+    compute();
+  });
+
+  $('addLump').addEventListener('click', () => {
+    const month = readYM('lumpMonth','lumpYear');
+    const amount = parseFloat($('lumpAmount').value);
+    if(!month || !amount || amount <= 0){ return; }
+    lumpSums.push({month, amount});
+    $('lumpAmount').value = '';
+    renderLumpList();
+    compute();
+  });
+
+  $('addIncrease').addEventListener('click', () => {
+    const month = readYM('incMonth','incYear');
+    const amount = parseFloat($('incAmount').value);
+    if(!month || !amount || amount <= 0){ return; }
+    increases.push({month, amount});
+    $('incAmount').value = '';
+    renderIncreaseList();
+    compute();
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    applyState(null);
+    compute();
+  });
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'isa'){
+          alert("That doesn't look like a summary file from this ISA tracker.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it from the other device first.');
+          return;
+        }
+        applyState(parsed.state);
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from this tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- core calculation ----------
+  function compute(){
+    const startYM = readYM('startMonth','startYear') || (nowDefault.year + '-' + nowDefault.month);
+    const startingBalance = parseFloat($('startingBalance').value) || 0;
+    const baseMonthly = parseFloat($('baseMonthly').value) || 0;
+    const years = parseInt($('years').value, 10);
+    const annualRate = parseFloat($('growth').value) / 100;
+    const totalMonths = years * 12;
+    const monthlyRate = Math.pow(1 + annualRate, 1/12) - 1;
+
+    $('yearsVal').textContent = years + (years === 1 ? ' year' : ' years');
+    $('growthVal').textContent = parseFloat($('growth').value).toFixed(1) + '%';
+
+    // sorted increase events by month offset
+    const incEvents = increases
+      .map(inc => ({offset: monthOffset(startYM, inc.month), amount: inc.amount}))
+      .filter(e => e.offset >= 0 && e.offset < totalMonths)
+      .sort((a,b) => a.offset - b.offset);
+
+    const lumpByOffset = {};
+    lumpSums.forEach(l => {
+      const off = monthOffset(startYM, l.month);
+      if(off >= 0 && off < totalMonths){
+        lumpByOffset[off] = (lumpByOffset[off] || 0) + l.amount;
+      }
+    });
+
+    let balance = startingBalance;
+    let cumulativeContrib = startingBalance;
+    let currentMonthly = baseMonthly;
+
+    const labels = [];
+    const balanceSeries = [];
+    const contribSeries = [];
+    const yearLabels = [];
+    const yearContrib = [];
+    const yearGrowth = [];
+
+    // rolling 12-month contribution amounts for allowance check
+    const monthlyContribAmounts = [];
+
+    let incPointer = 0;
+
+    for(let m = 0; m < totalMonths; m++){
+      while(incPointer < incEvents.length && incEvents[incPointer].offset === m){
+        currentMonthly = incEvents[incPointer].amount;
+        incPointer++;
+      }
+      const lump = lumpByOffset[m] || 0;
+      const contribThisMonth = currentMonthly + lump;
+
+      balance = (balance + contribThisMonth) * (1 + monthlyRate);
+      cumulativeContrib += contribThisMonth;
+      monthlyContribAmounts.push(contribThisMonth);
+
+      const [sy, sm] = startYM.split('-').map(Number);
+      const d = new Date(sy, sm - 1 + m + 1, 1);
+      labels.push(d.toLocaleDateString('en-GB', {month:'short', year:'2-digit'}));
+      balanceSeries.push(Math.round(balance));
+      contribSeries.push(Math.round(cumulativeContrib));
+
+      if((m+1) % 12 === 0){
+        const yr = (m+1)/12;
+        yearLabels.push('Year ' + yr);
+        yearContrib.push(Math.round(cumulativeContrib));
+        yearGrowth.push(Math.round(balance - cumulativeContrib));
+      }
+    }
+
+    // allowance check: rolling 12-month sums
+    let maxRolling = 0;
+    for(let i = 0; i < monthlyContribAmounts.length; i++){
+      let sum = 0;
+      for(let j = i; j < Math.min(i+12, monthlyContribAmounts.length); j++){
+        sum += monthlyContribAmounts[j];
+      }
+      if(sum > maxRolling) maxRolling = sum;
+    }
+    const allowanceEl = $('allowanceWarning');
+    if(maxRolling > 20000){
+      allowanceEl.style.display = 'block';
+      allowanceEl.textContent = `⚠ At points in this plan, contributions in a 12-month period reach ~${gbp(maxRolling)}, which exceeds the current £20,000/year ISA allowance. You may need to spread contributions across tax years or use other accounts.`;
+    } else {
+      allowanceEl.style.display = 'none';
+    }
+
+    // stagger x labels: show every 6 months if long
+    const step = totalMonths > 36 ? 6 : (totalMonths > 12 ? 3 : 1);
+    const displayLabels = labels.map((l, i) => (i % step === 0 || i === labels.length-1) ? l : '');
+
+    growthChart.data.labels = displayLabels;
+    growthChart.data.datasets[0].data = balanceSeries;
+    growthChart.data.datasets[1].data = contribSeries;
+    growthChart.update();
+
+    barChart.data.labels = yearLabels;
+    barChart.data.datasets[0].data = yearContrib;
+    barChart.data.datasets[1].data = yearGrowth;
+    barChart.update();
+
+    const finalBalance = balanceSeries[balanceSeries.length-1] || startingBalance;
+    const finalContrib = contribSeries[contribSeries.length-1] || startingBalance;
+    const finalGrowth = finalBalance - finalContrib;
+
+    doughnutChart.data.datasets[0].data = [finalContrib, Math.max(finalGrowth,0)];
+    doughnutChart.update();
+
+    $('statFinal').textContent = gbp(finalBalance);
+    $('statContrib').textContent = gbp(finalContrib);
+    $('statGrowth').textContent = gbp(finalGrowth);
+    $('statMonthly').textContent = gbp(currentMonthly) + '/mo';
+
+    lastResults = {
+      startingBalance,
+      monthlyContribution: currentMonthly,
+      years,
+      growthRatePct: parseFloat($('growth').value),
+      finalBalance,
+      totalContributed: finalContrib,
+      totalGrowth: finalGrowth,
+      allowanceWarning: maxRolling > 20000,
+      series: {
+        balanceSeries,
+        contribSeries
+      }
+    };
+
+    saveNow();
+  }
+
+  $('exportData').addEventListener('click', () => {
+    downloadJSON('isa-summary.json', {
+      tracker: 'isa',
+      exportedAt: new Date().toISOString(),
+      ...lastResults,
+      state: buildState()
+    });
+  });
+
+  // ---------- wire up inputs ----------
+  ['startMonth','startYear','startingBalance','baseMonthly'].forEach(id => {
+    $(id).addEventListener('change', compute);
+  });
+  $('years').addEventListener('input', compute);
+  $('growth').addEventListener('input', compute);
+
+  // ---------- init ----------
+  initCharts();
+  compute();
+})();
+</script>
+</body>
+</html>

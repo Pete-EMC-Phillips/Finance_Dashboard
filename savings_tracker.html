@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Savings Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0d130f;
+    --panel:#141d17;
+    --panel-2:#1b271f;
+    --border:#2a3a30;
+    --text:#eef4f0;
+    --muted:#9db3a8;
+    --accent:#a3e635;
+    --accent-2:#5eead4;
+    --acct1:#2fd6a7;
+    --acct2:#f2b84b;
+    --acct3:#4fc3f7;
+    --acct4:#b98cff;
+    --total:#a3e635;
+    --surplus:#2fd6a7;
+    --deficit:#ff6b6b;
+    --warn:#ffb454;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #17261c 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:900px;margin:0 auto;}
+  header{margin-bottom:18px;}
+  header h1{
+    font-size:1.7rem;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--text);
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card p.hint{color:var(--muted);font-size:0.8rem;margin:-8px 0 14px;}
+  label{
+    display:block;
+    font-size:0.82rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:16px;}
+  input[type="number"], input[type="text"]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+  }
+  input:focus{ border-color:var(--accent); }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .month-year{display:grid;grid-template-columns:1.3fr 0.9fr;gap:8px;}
+  .month-year > *{min-width:0;}
+  select{
+    -webkit-appearance:menulist;
+    appearance:menulist;
+    width:100%;
+    min-width:0;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    cursor:pointer;
+  }
+  select:focus{border-color:var(--accent);}
+  .card-balance-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;}
+  @media (max-width: 560px){
+    .card-balance-grid{grid-template-columns:1fr;}
+    .row2{grid-template-columns:1fr;}
+  }
+  button.add-btn{
+    background:var(--accent);
+    color:#0d130f;
+    border:none;font-weight:700;
+    padding:10px 16px;border-radius:9px;
+    cursor:pointer;font-size:0.85rem;
+    white-space:nowrap;
+  }
+  button.add-btn:hover{filter:brightness(1.08);}
+  .empty-note{color:var(--muted);font-size:0.82rem;font-style:italic;padding:30px 0;text-align:center;}
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 700px){
+    .summary-grid{grid-template-columns:1fr;}
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+  }
+  .stat .label{color:var(--muted);font-size:0.78rem;margin-bottom:6px;}
+  .stat .value{font-size:1.25rem;font-weight:700;}
+  .stat.neu .value{color:var(--text);}
+  .stat.surplus .value{color:var(--surplus);}
+  .stat.deficit .value{color:var(--deficit);}
+  .chart-card canvas{max-height:340px;}
+  .remove-btn{
+    background:none;border:none;color:var(--deficit);
+    cursor:pointer;font-size:1.1rem;line-height:1;
+    padding:2px 6px;border-radius:6px;
+  }
+  .remove-btn:hover{background:rgba(255,107,107,0.15);}
+  .balance-table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+  .balance-table th{
+    text-align:right;color:var(--muted);font-weight:600;
+    padding:8px 10px;border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .balance-table th:first-child{text-align:left;}
+  .balance-table th:last-child{width:1%;}
+  .balance-table td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--border);}
+  .balance-table td:first-child{text-align:left;color:var(--text);}
+  .balance-table td.total{font-weight:700;color:var(--text);}
+  .balance-table tr:hover{background:var(--panel-2);}
+  .save-note{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;flex-wrap:wrap;
+    color:var(--muted);
+    font-size:0.78rem;
+    margin-bottom:18px;
+  }
+  .save-note button, .save-note .file-btn{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:0.78rem;
+    display:inline-block;
+  }
+  .save-note button:hover, .save-note .file-btn:hover{color:var(--deficit);border-color:var(--deficit);}
+  footer{
+    text-align:center;color:var(--muted);
+    font-size:0.78rem;margin-top:20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand-logo" style="margin-bottom:14px;">
+      <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
+        <path d="M20 60 L43 38 L66 60" fill="none" stroke="#96a2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="27" y="60" width="32" height="18" fill="none" stroke="#96a2b8" stroke-width="2.5"/>
+        <path d="M18 70 L32 58 L44 66 L60 44" fill="none" stroke="#2fd6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="60" cy="44" r="3.5" fill="#2fd6a7"/>
+        <text x="97" y="52" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="30" font-weight="700" fill="#eaeef4">Phillips<tspan fill="#4fc3f7"> Finance</tspan></text>
+        <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
+      </svg>
+    </div>
+    <h1>💰 Savings Tracker</h1>
+    <p>Track your savings accounts month to month and see your total savings trend over time.</p>
+  </header>
+
+  <div class="save-note">
+    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+    <span style="display:flex;gap:8px;">
+      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+      <button id="exportData" type="button">⬇ Export summary</button>
+      <button id="clearSaved" type="button">Reset to defaults</button>
+    </span>
+  </div>
+
+  <div class="summary-grid">
+    <div class="stat neu">
+      <div class="label">Total savings (latest)</div>
+      <div class="value" id="statTotalNow">£0</div>
+    </div>
+    <div class="stat neu" id="statChangeCard">
+      <div class="label">Change vs previous entry</div>
+      <div class="value" id="statChange">—</div>
+    </div>
+    <div class="stat neu">
+      <div class="label">Highest total recorded</div>
+      <div class="value" id="statPeak">£0</div>
+    </div>
+  </div>
+
+  <div class="card chart-card">
+    <h2><span class="dot" style="background:var(--total);"></span>Total savings over time</h2>
+    <div id="chartEmpty" class="empty-note">Add at least one monthly balance below to see your savings trend.</div>
+    <canvas id="savingsChart" style="display:none;"></canvas>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--accent);"></span>Add a monthly balance</h2>
+    <p class="hint">New entries are added to the top of the table below — no scrolling needed.</p>
+    <div class="field">
+      <label>Month</label>
+      <div class="month-year">
+        <select id="entryMonth"></select>
+        <input type="number" id="entryYear" min="2000" max="2100" step="1">
+      </div>
+    </div>
+    <div class="card-balance-grid">
+      <div class="field" id="entryBalWrap0" style="margin-bottom:10px;">
+        <label id="entryBalLabel0" for="entryBal0">Account 1 balance (£)</label>
+        <input type="number" id="entryBal0" min="0" step="10">
+      </div>
+      <div class="field" id="entryBalWrap1" style="margin-bottom:10px;">
+        <label id="entryBalLabel1" for="entryBal1">Account 2 balance (£)</label>
+        <input type="number" id="entryBal1" min="0" step="10">
+      </div>
+      <div class="field" id="entryBalWrap2" style="margin-bottom:10px;">
+        <label id="entryBalLabel2" for="entryBal2">Account 3 balance (£)</label>
+        <input type="number" id="entryBal2" min="0" step="10">
+      </div>
+      <div class="field" id="entryBalWrap3" style="margin-bottom:10px;">
+        <label id="entryBalLabel3" for="entryBal3">Account 4 balance (£)</label>
+        <input type="number" id="entryBal3" min="0" step="10">
+      </div>
+    </div>
+    <button class="add-btn" id="addEntry" type="button" style="margin-top:6px;">Add / update this month</button>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--accent-2);"></span>Your accounts</h2>
+    <p class="hint">Name up to 4 accounts — any you don't use can keep their default name.</p>
+    <div class="row2">
+      <div class="field">
+        <label for="acctName0">Account 1</label>
+        <input type="text" id="acctName0" value="Account 1" maxlength="24">
+      </div>
+      <div class="field">
+        <label for="acctName1">Account 2</label>
+        <input type="text" id="acctName1" value="Account 2" maxlength="24">
+      </div>
+    </div>
+    <div class="row2" style="margin-bottom:0;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="acctName2">Account 3</label>
+        <input type="text" id="acctName2" value="Account 3" maxlength="24">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="acctName3">Account 4</label>
+        <input type="text" id="acctName3" value="Account 4" maxlength="24">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--text);"></span>Monthly balances</h2>
+    <p class="hint">Newest month at the top. Adding a balance for a month that's already listed updates that row instead of duplicating it.</p>
+    <div style="overflow-x:auto;">
+    <table class="balance-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th id="thAcct0">Account 1</th>
+          <th id="thAcct1">Account 2</th>
+          <th id="thAcct2">Account 3</th>
+          <th id="thAcct3">Account 4</th>
+          <th>Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="balanceTableBody">
+        <tr><td colspan="7" class="empty-note">No balances recorded yet.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <footer>Illustrative only — not financial advice. Simple manual balance tracker: doesn't model interest earned, deposits vs withdrawals, or account terms. "Highest total recorded" and the chart are based only on the months you've entered.</footer>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'savingsTracker.state.v1';
+  const $ = id => document.getElementById(id);
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  let acctNames = ['Account 1','Account 2','Account 3','Account 4'];
+  let entries = []; // { month:'YYYY-MM', balances:[n,n,n,n] } -- kept sorted newest-first
+  let lastResults = {};
+  let savingsChart; // declared early so applyState()'s renderAcctLabels() can safely check it
+
+  function downloadJSON(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildState(){
+    return { acctNames, entries };
+  }
+
+  function saveNow(){
+    try{
+      const state = buildState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const status = $('saveStatus');
+      if(status){
+        status.textContent = 'Saved just now in this browser.';
+        clearTimeout(saveNow._t);
+        saveNow._t = setTimeout(() => {
+          status.textContent = 'Your inputs are saved automatically in this browser.';
+        }, 1500);
+      }
+    }catch(e){ /* localStorage unavailable */ }
+  }
+
+  function gbp(n){
+    if(n == null || isNaN(n)) return '—';
+    return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits:0});
+  }
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function populateMonthSelect(sel){
+    sel.innerHTML = MONTH_NAMES.map((name, i) =>
+      `<option value="${String(i+1).padStart(2,'0')}">${name}</option>`
+    ).join('');
+  }
+  populateMonthSelect($('entryMonth'));
+
+  function defaultStartMonth(){
+    const d = new Date();
+    return {month: String(d.getMonth()+1).padStart(2,'0'), year: d.getFullYear()};
+  }
+  const nowDefault = defaultStartMonth();
+
+  function readYM(monthSelId, yearInputId){
+    const month = $(monthSelId).value;
+    const year = parseInt($(yearInputId).value, 10);
+    if(!month || !year || isNaN(year)) return null;
+    return year + '-' + month;
+  }
+
+  function fmtMonth(ym){
+    const [y,m] = ym.split('-').map(Number);
+    return MONTH_NAMES[m-1].slice(0,3) + ' ' + y;
+  }
+
+  function nextMonth(ym){
+    let [y,m] = ym.split('-').map(Number);
+    m += 1;
+    if(m > 12){ m = 1; y += 1; }
+    return y + '-' + String(m).padStart(2,'0');
+  }
+
+  // apply a state object (from localStorage or an imported file) to every field
+  function applyState(saved){
+    acctNames = (saved && Array.isArray(saved.acctNames) && saved.acctNames.length === 4) ? saved.acctNames : ['Account 1','Account 2','Account 3','Account 4'];
+    entries = (saved && Array.isArray(saved.entries)) ? saved.entries : [];
+    entries.sort((a,b) => b.month.localeCompare(a.month));
+    [0,1,2,3].forEach(i => { $('acctName' + i).value = acctNames[i]; });
+    renderAcctLabels();
+  }
+
+  // ---------- load saved state ----------
+  const saved = loadSaved();
+  applyState(saved);
+  $('entryMonth').value = nowDefault.month;
+  $('entryYear').value = nowDefault.year;
+
+  // ---------- chart ----------
+  const gridColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.color = '#9db3a8';
+  Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+  const ACCOUNT_COLORS = ['#2fd6a7','#f2b84b','#4fc3f7','#b98cff'];
+
+  function initChart(){
+    const ctx = $('savingsChart').getContext('2d');
+    savingsChart = new Chart(ctx, {
+      type:'line',
+      data:{
+        labels:[],
+        datasets:[
+          ...[0,1,2,3].map(i => ({
+            label: acctNames[i],
+            data:[],
+            borderColor: ACCOUNT_COLORS[i],
+            backgroundColor:'transparent',
+            borderWidth:1.5,
+            borderDash:[4,3],
+            tension:0.15,
+            pointRadius:2,
+            hidden:false
+          })),
+          {
+            label:'Total',
+            data:[],
+            borderColor:'#a3e635',
+            backgroundColor:'rgba(163,230,53,0.14)',
+            fill:true,
+            borderWidth:3,
+            tension:0.2,
+            pointRadius:3
+          }
+        ]
+      },
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:14}},
+          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+        },
+        scales:{
+          x:{grid:{display:false}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000 >= 1 ? (v/1000)+'k' : v)}, beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  // ---------- account name labels (table headers + add-form labels) ----------
+  function renderAcctLabels(){
+    [0,1,2,3].forEach(i => {
+      const name = acctNames[i] || ('Account ' + (i+1));
+      $('thAcct' + i).textContent = name;
+      $('entryBalLabel' + i).textContent = name + ' balance (£)';
+      if(savingsChart){
+        savingsChart.data.datasets[i].label = name;
+      }
+    });
+  }
+
+  [0,1,2,3].forEach(i => {
+    $('acctName' + i).addEventListener('input', () => {
+      acctNames[i] = $('acctName' + i).value.trim() || ('Account ' + (i+1));
+      renderAcctLabels();
+      compute();
+    });
+  });
+
+  // ---------- entries ----------
+  function upsertEntry(month, balances){
+    const idx = entries.findIndex(e => e.month === month);
+    if(idx >= 0){
+      entries[idx] = {month, balances};
+    } else {
+      entries.push({month, balances});
+    }
+    entries.sort((a,b) => b.month.localeCompare(a.month));
+  }
+
+  function entryTotal(e){
+    return e.balances.reduce((s,v) => s + (parseFloat(v) || 0), 0);
+  }
+
+  $('addEntry').addEventListener('click', () => {
+    const month = readYM('entryMonth', 'entryYear');
+    if(!month){ alert('Please choose a month and year.'); return; }
+    const balances = [0,1,2,3].map(i => parseFloat($('entryBal' + i).value) || 0);
+    upsertEntry(month, balances);
+    // clear balance inputs and advance the picker to the following month, ready for next time
+    [0,1,2,3].forEach(i => { $('entryBal' + i).value = ''; });
+    const next = nextMonth(month);
+    const [ny, nm] = next.split('-');
+    $('entryMonth').value = nm;
+    $('entryYear').value = ny;
+    compute();
+  });
+
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-btn');
+    if(!btn) return;
+    const idx = Number(btn.dataset.idx);
+    entries.splice(idx, 1);
+    compute();
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    if(!confirm('Reset the savings tracker to defaults? This clears all saved balances in this browser.')) return;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    applyState(null);
+    compute();
+  });
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'savings'){
+          alert("That doesn't look like a summary file from this Savings tracker.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it from the other device first.');
+          return;
+        }
+        applyState(parsed.state);
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from this tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- render table ----------
+  function renderTable(){
+    const body = $('balanceTableBody');
+    if(entries.length === 0){
+      body.innerHTML = '<tr><td colspan="7" class="empty-note">No balances recorded yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = entries.map((e, idx) => {
+      const total = entryTotal(e);
+      const cells = [0,1,2,3].map(i => `<td>${gbp(e.balances[i] || 0)}</td>`).join('');
+      return `<tr>
+        <td>${fmtMonth(e.month)}</td>
+        ${cells}
+        <td class="total">${gbp(total)}</td>
+        <td><button class="remove-btn" data-idx="${idx}" title="Remove this month">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ---------- compute / render everything ----------
+  function compute(){
+    // entries is sorted newest-first; chart wants chronological (oldest-first)
+    const chronological = entries.slice().reverse();
+    const labels = chronological.map(e => fmtMonth(e.month));
+    const perAccount = [0,1,2,3].map(i => chronological.map(e => e.balances[i] || 0));
+    const totals = chronological.map(e => entryTotal(e));
+
+    const hasData = entries.length > 0;
+    $('chartEmpty').style.display = hasData ? 'none' : '';
+    $('savingsChart').style.display = hasData ? '' : 'none';
+
+    if(hasData){
+      savingsChart.data.labels = labels;
+      [0,1,2,3].forEach(i => {
+        savingsChart.data.datasets[i].data = perAccount[i];
+        // hide an account's line by default if it never has a nonzero balance and still has its default name
+        const everUsed = perAccount[i].some(v => v !== 0);
+        savingsChart.data.datasets[i].hidden = !everUsed && acctNames[i] === ('Account ' + (i+1));
+      });
+      savingsChart.data.datasets[4].data = totals;
+      savingsChart.update();
+    }
+
+    const totalNow = entries.length ? entryTotal(entries[0]) : 0;
+    const previousTotal = entries.length > 1 ? entryTotal(entries[1]) : null;
+    const change = previousTotal != null ? totalNow - previousTotal : null;
+    const peak = totals.length ? Math.max(...totals) : 0;
+
+    $('statTotalNow').textContent = gbp(totalNow);
+    $('statPeak').textContent = gbp(peak);
+
+    const changeCard = $('statChangeCard');
+    if(change == null){
+      changeCard.className = 'stat neu';
+      $('statChange').textContent = '—';
+    } else {
+      changeCard.className = 'stat ' + (change >= 0 ? 'surplus' : 'deficit');
+      $('statChange').textContent = (change > 0 ? '+' : (change < 0 ? '-' : '')) + gbp(Math.abs(change));
+    }
+
+    renderTable();
+
+    lastResults = {
+      accountNames: acctNames.slice(),
+      totalNow,
+      changeVsPrevious: change,
+      highestTotal: peak,
+      monthsTracked: entries.length,
+      series: {
+        labels,
+        totals,
+        perAccount
+      }
+    };
+
+    saveNow();
+  }
+
+  $('exportData').addEventListener('click', () => {
+    downloadJSON('savings-summary.json', {
+      tracker: 'savings',
+      exportedAt: new Date().toISOString(),
+      ...lastResults,
+      state: buildState()
+    });
+  });
+
+  // ---------- init ----------
+  initChart();
+  renderAcctLabels();
+  compute();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Offset Mortgage Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1620;
+    --panel:#15202e;
+    --panel-2:#1b2839;
+    --border:#293a52;
+    --text:#eaf1fb;
+    --muted:#93a4bd;
+    --accent:#4fc3f7;
+    --accent-2:#ff8a65;
+    --scheduled:#8993ab;
+    --offset:#4fc3f7;
+    --overpay:#2fd6a7;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #1a2b40 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  header h1{
+    font-size:1.7rem;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width: 920px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--text);
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card p.hint{color:var(--muted);font-size:0.8rem;margin:-8px 0 14px;}
+  label{
+    display:block;
+    font-size:0.82rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:16px;}
+  input[type="number"]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+  }
+  input[type="number"]:focus{ border-color:var(--accent); }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .month-year{display:grid;grid-template-columns:1.3fr 0.9fr;gap:8px;}
+  .month-year > *{min-width:0;}
+  select{
+    -webkit-appearance:menulist;
+    appearance:menulist;
+    width:100%;
+    min-width:0;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+    cursor:pointer;
+  }
+  select:focus{border-color:var(--accent);}
+  .slider-row{display:flex;align-items:center;gap:12px;}
+  input[type="range"]{
+    flex:1;
+    -webkit-appearance:none;
+    height:6px;
+    border-radius:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px;height:18px;border-radius:50%;
+    background:#fff;
+    border:3px solid var(--accent);
+    cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:18px;height:18px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);cursor:pointer;
+  }
+  .slider-val{
+    min-width:64px;text-align:right;
+    font-weight:700;font-size:1rem;
+    color:var(--accent);
+  }
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 760px){
+    .summary-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  .summary-grid-2{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 760px){
+    .summary-grid-2{grid-template-columns:1fr;}
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+  }
+  .stat .label{color:var(--muted);font-size:0.78rem;margin-bottom:6px;}
+  .stat .value{font-size:1.25rem;font-weight:700;}
+  .stat.acc .value{color:var(--accent);}
+  .stat.overpay .value{color:var(--overpay);}
+  .stat.neu .value{color:var(--text);}
+  .chart-card canvas{max-height:360px;}
+  .chart-note{
+    color:var(--muted);
+    font-size:0.8rem;
+    margin:10px 0 0;
+    text-align:center;
+  }
+  .warning{
+    background:rgba(255,180,84,0.12);
+    border:1px solid rgba(255,180,84,0.4);
+    color:var(--warn);
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:0.82rem;
+    margin-bottom:14px;
+  }
+  .save-note{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;flex-wrap:wrap;
+    color:var(--muted);
+    font-size:0.78rem;
+    margin-top:20px;
+  }
+  .save-note button, .save-note .file-btn{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:0.78rem;
+    display:inline-block;
+  }
+  .save-note button:hover, .save-note .file-btn:hover{color:var(--danger);border-color:var(--danger);}
+  footer{
+    text-align:center;color:var(--muted);
+    font-size:0.78rem;margin-top:20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand-logo" style="margin-bottom:14px;">
+      <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
+        <path d="M20 60 L43 38 L66 60" fill="none" stroke="#96a2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="27" y="60" width="32" height="18" fill="none" stroke="#96a2b8" stroke-width="2.5"/>
+        <path d="M18 70 L32 58 L44 66 L60 44" fill="none" stroke="#2fd6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="60" cy="44" r="3.5" fill="#2fd6a7"/>
+        <text x="97" y="52" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="30" font-weight="700" fill="#eaeef4">Phillips<tspan fill="#4fc3f7"> Finance</tspan></text>
+        <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
+      </svg>
+    </div>
+    <h1>🏠 Offset Mortgage Tracker</h1>
+    <p>See how your offset savings and any overpayments shorten your mortgage term and cut the interest you pay.</p>
+  </header>
+
+  <div class="layout">
+    <!-- CONTROLS -->
+    <div>
+      <div class="card">
+        <h2><span class="dot"></span>Mortgage details</h2>
+        <div class="field">
+          <label>Figures as of</label>
+          <div class="month-year">
+            <select id="startMonth"></select>
+            <input type="number" id="startYear" min="2000" max="2100" step="1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="mortgageBalance">Mortgage balance left (£)</label>
+            <input type="number" id="mortgageBalance" value="200000" min="0" step="1000">
+          </div>
+          <div class="field">
+            <label for="offsetBalance">Offset savings balance (£)</label>
+            <input type="number" id="offsetBalance" value="20000" min="0" step="500">
+          </div>
+        </div>
+        <div class="field">
+          <label for="houseValue">Estimated house value (£)</label>
+          <input type="number" id="houseValue" value="280000" min="0" step="1000">
+        </div>
+        <p class="hint" style="margin-top:-6px;">Used for the net worth figures on the dashboard (house value minus what's left on the mortgage) — assumed constant, no appreciation modelled.</p>
+        <div class="row2">
+          <div class="field">
+            <label for="termYears">Remaining term — years</label>
+            <input type="number" id="termYears" value="22" min="0" max="40" step="1">
+          </div>
+          <div class="field">
+            <label for="termMonths">Remaining term — months</label>
+            <input type="number" id="termMonths" value="0" min="0" max="11" step="1">
+          </div>
+        </div>
+        <div class="field">
+          <label for="rate">Interest rate</label>
+          <div class="slider-row">
+            <input type="range" id="rate" min="0.50" max="10.00" step="0.01" value="4.24">
+            <div class="slider-val" id="rateVal">4.24%</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="overpayment">Monthly overpayment (£)</label>
+          <input type="number" id="overpayment" value="0" min="0" step="25">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="actualPayment" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Actual monthly mortgage charge (£)</span>
+            <button id="syncActual" type="button" style="background:none;border:none;color:var(--accent);font-size:0.75rem;cursor:pointer;padding:0;">↻ use calculated</button>
+          </label>
+          <input type="number" id="actualPayment" value="1166" min="0" step="1">
+        </div>
+      </div>
+
+      <p class="hint" style="padding:0 4px;">"Calculated monthly payment" below is worked out from the balance, remaining term and rate above, as if there were no offset — handy for seeing what a rate change would theoretically do to your payment. The "actual" figure is what really leaves your account (lenders often use daily interest, so it won't match exactly) — the graphs and everything else below are based on this actual figure, not the calculated one. It won't update automatically when you tweak the other fields, and it's the number that'll line up with the mortgage figure in your budget tracker once we link them. The offset balance is assumed to stay level throughout.</p>
+
+      <div class="save-note">
+        <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+        <span style="display:flex;gap:8px;">
+          <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+          <button id="exportData" type="button">⬇ Export summary</button>
+          <button id="clearSaved" type="button">Reset to defaults</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div>
+      <div id="interestWarning" class="warning" style="display:none;"></div>
+
+      <div class="summary-grid">
+        <div class="stat neu">
+          <div class="label">Calculated payment <span style="font-weight:400;">(rate-sensitive)</span></div>
+          <div class="value" id="statPayment">£0</div>
+        </div>
+        <div class="stat acc">
+          <div class="label">Payoff — with offset + overpay</div>
+          <div class="value" id="statPayoff">—</div>
+        </div>
+        <div class="stat overpay">
+          <div class="label">Time saved vs scheduled</div>
+          <div class="value" id="statTimeSaved">—</div>
+        </div>
+        <div class="stat overpay">
+          <div class="label">Interest saved vs scheduled</div>
+          <div class="value" id="statInterestSaved">£0</div>
+        </div>
+      </div>
+
+      <div class="summary-grid-2">
+        <div class="stat neu">
+          <div class="label">Total interest — scheduled (no offset)</div>
+          <div class="value" id="statInterestScheduled">£0</div>
+        </div>
+        <div class="stat acc">
+          <div class="label">Total interest — with offset + overpay</div>
+          <div class="value" id="statInterestFinal">£0</div>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Mortgage balance &amp; remaining term</h2>
+        <canvas id="balanceChart"></canvas>
+        <p class="chart-note" id="balanceNote"></p>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot" style="background:var(--overpay)"></span>Cumulative interest paid</h2>
+        <canvas id="interestChart"></canvas>
+        <p class="chart-note">The gap between the lines is your interest saving — each line flattens once that scenario's mortgage is paid off.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>Illustrative only — not financial advice. Graphs and stats use your "actual monthly mortgage charge", not the calculated one. Assumes monthly compounding at a constant rate for the whole projection (real lenders often use daily interest, which is why actual and calculated differ slightly, and offset deals often reset periodically), a level offset savings balance, no fees or early repayment charges, and that the actual payment stays fixed at whatever you've entered. Overpayments are assumed to go straight to the mortgage.</footer>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'mortgageTracker.state.v1';
+  const $ = id => document.getElementById(id);
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  let lastResults = {};  // populated at the end of compute(), read by the export button
+
+  function downloadJSON(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildState(){
+    return {
+      startMonth: $('startMonth').value,
+      startYear: $('startYear').value,
+      mortgageBalance: $('mortgageBalance').value,
+      offsetBalance: $('offsetBalance').value,
+      houseValue: $('houseValue').value,
+      termYears: $('termYears').value,
+      termMonths: $('termMonths').value,
+      rate: $('rate').value,
+      overpayment: $('overpayment').value,
+      actualPayment: $('actualPayment').value
+    };
+  }
+
+  function saveNow(){
+    try{
+      const state = buildState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const status = $('saveStatus');
+      if(status){
+        status.textContent = 'Saved just now in this browser.';
+        clearTimeout(saveNow._t);
+        saveNow._t = setTimeout(() => {
+          status.textContent = 'Your inputs are saved automatically in this browser.';
+        }, 1500);
+      }
+    }catch(e){ /* localStorage unavailable */ }
+  }
+
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function populateMonthSelect(sel){
+    sel.innerHTML = MONTH_NAMES.map((name, i) =>
+      `<option value="${String(i+1).padStart(2,'0')}">${name}</option>`
+    ).join('');
+  }
+  populateMonthSelect($('startMonth'));
+
+  function defaultStartMonth(){
+    const d = new Date();
+    return {month: String(d.getMonth()+1).padStart(2,'0'), year: d.getFullYear()};
+  }
+  const nowDefault = defaultStartMonth();
+
+  // apply a state object (from localStorage or an imported file) to every field
+  function applyState(saved){
+    $('startMonth').value = (saved && saved.startMonth) || nowDefault.month;
+    $('startYear').value = (saved && saved.startYear) || nowDefault.year;
+    $('mortgageBalance').value = (saved && saved.mortgageBalance) != null ? saved.mortgageBalance : 200000;
+    $('offsetBalance').value = (saved && saved.offsetBalance) != null ? saved.offsetBalance : 20000;
+    $('houseValue').value = (saved && saved.houseValue) != null ? saved.houseValue : 280000;
+    $('termYears').value = (saved && saved.termYears) != null ? saved.termYears : 22;
+    $('termMonths').value = (saved && saved.termMonths) != null ? saved.termMonths : 0;
+    $('rate').value = (saved && saved.rate) != null ? saved.rate : 4.24;
+    $('overpayment').value = (saved && saved.overpayment) != null ? saved.overpayment : 0;
+    $('actualPayment').value = (saved && saved.actualPayment) != null ? saved.actualPayment : 1166;
+  }
+
+  const saved = loadSaved();
+  applyState(saved);
+
+  function gbp(n){
+    return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits:0});
+  }
+  function fmtYM(months){
+    const y = Math.floor(months/12), m = months%12;
+    if(y === 0) return m + (m===1 ? ' month' : ' months');
+    if(m === 0) return y + (y===1 ? ' year' : ' years');
+    return `${y}y ${m}m`;
+  }
+
+  // ---------- chart instances ----------
+  let balanceChart, interestChart;
+  const gridColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.color = '#93a4bd';
+  Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+
+  function initCharts(){
+    const bctx = $('balanceChart').getContext('2d');
+    balanceChart = new Chart(bctx, {
+      type:'line',
+      data:{labels:[], datasets:[
+        {label:'Scheduled (no offset, no overpay)', data:[], borderColor:'#8993ab', backgroundColor:'transparent', borderDash:[5,4], fill:false, tension:0.15, pointRadius:0, borderWidth:2},
+        {label:'With offset', data:[], borderColor:'#4fc3f7', backgroundColor:'rgba(79,195,247,0.10)', fill:false, tension:0.15, pointRadius:0, borderWidth:2.5},
+        {label:'With offset + overpayment', data:[], borderColor:'#2fd6a7', backgroundColor:'rgba(47,214,167,0.12)', fill:false, tension:0.15, pointRadius:0, borderWidth:2.5}
+      ]},
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, ticks:{maxTicksLimit:10}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}, beginAtZero:true}
+        }
+      }
+    });
+
+    const ictx = $('interestChart').getContext('2d');
+    interestChart = new Chart(ictx, {
+      type:'line',
+      data:{labels:[], datasets:[
+        {label:'Scheduled (no offset, no overpay)', data:[], borderColor:'#8993ab', backgroundColor:'transparent', borderDash:[5,4], fill:false, tension:0.15, pointRadius:0, borderWidth:2},
+        {label:'With offset', data:[], borderColor:'#4fc3f7', backgroundColor:'transparent', fill:false, tension:0.15, pointRadius:0, borderWidth:2.5},
+        {label:'With offset + overpayment', data:[], borderColor:'#2fd6a7', backgroundColor:'transparent', fill:false, tension:0.15, pointRadius:0, borderWidth:2.5}
+      ]},
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, ticks:{maxTicksLimit:10}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}, beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  // ---------- mortgage math ----------
+  function calcPayment(balance, monthlyRate, n){
+    if(n <= 0) return balance;
+    if(monthlyRate === 0) return balance / n;
+    return balance * monthlyRate / (1 - Math.pow(1 + monthlyRate, -n));
+  }
+
+  // simulate a payoff scenario for up to `capMonths`, month-by-month
+  function simulateMortgage(balance0, basePayment, extraOverpay, useOffset, offsetAmt, monthlyRate, capMonths){
+    let balance = balance0;
+    let months = 0;
+    let cumInterest = 0;
+    const balances = [Math.round(balance)];
+    const interestSeries = [0];
+    let stalled = false;
+
+    while(balance > 0.5 && months < capMonths){
+      const netBalance = useOffset ? Math.max(0, balance - offsetAmt) : balance;
+      const interest = netBalance * monthlyRate;
+      const payment = basePayment + extraOverpay;
+      const principal = payment - interest;
+      if(principal <= 0){
+        stalled = true;
+        break;
+      }
+      balance -= principal;
+      if(balance < 0) balance = 0;
+      cumInterest += interest;
+      months++;
+      balances.push(Math.round(balance));
+      interestSeries.push(Math.round(cumInterest));
+    }
+    return {months, cumInterest: Math.round(cumInterest), balances, interestSeries, stalled};
+  }
+
+  // pad a scenario's series out to `totalMonths` so all three lines share an x-axis:
+  // balance flatlines at 0, interest flatlines at its final total once paid off
+  function padSeries(sim, totalMonths){
+    const balances = sim.balances.slice();
+    const interestSeries = sim.interestSeries.slice();
+    const lastInterest = interestSeries[interestSeries.length - 1] || 0;
+    while(balances.length <= totalMonths){
+      balances.push(0);
+      interestSeries.push(lastInterest);
+    }
+    return {balances: balances.slice(0, totalMonths+1), interestSeries: interestSeries.slice(0, totalMonths+1)};
+  }
+
+  function compute(){
+    const startYM = {
+      month: $('startMonth').value || nowDefault.month,
+      year: parseInt($('startYear').value, 10) || nowDefault.year
+    };
+    const mortgageBalance = parseFloat($('mortgageBalance').value) || 0;
+    const offsetBalance = parseFloat($('offsetBalance').value) || 0;
+    const termYears = parseInt($('termYears').value, 10) || 0;
+    const termMonths = parseInt($('termMonths').value, 10) || 0;
+    const ratePct = parseFloat($('rate').value) || 0;
+    const overpayment = parseFloat($('overpayment').value) || 0;
+    const actualPayment = parseFloat($('actualPayment').value) || 0;
+
+    $('rateVal').textContent = ratePct.toFixed(2) + '%';
+
+    const n = Math.max(1, termYears * 12 + termMonths);
+    const monthlyRate = ratePct / 100 / 12;
+    const payment = calcPayment(mortgageBalance, monthlyRate, n);
+
+    $('statPayment').textContent = gbp(payment);
+
+    // graphs and stats are driven by the actual payment, not the calculated one —
+    // give the simulation a generous cap since actual vs calculated can drift
+    const capMonths = Math.max(n * 2, 600);
+    const scheduled = simulateMortgage(mortgageBalance, actualPayment, 0, false, 0, monthlyRate, capMonths);
+    const withOffset = simulateMortgage(mortgageBalance, actualPayment, 0, true, offsetBalance, monthlyRate, capMonths);
+    const withOverpay = simulateMortgage(mortgageBalance, actualPayment, overpayment, true, offsetBalance, monthlyRate, capMonths);
+
+    const warnEl = $('interestWarning');
+    if(scheduled.stalled || withOffset.stalled || withOverpay.stalled){
+      warnEl.style.display = 'block';
+      warnEl.textContent = '⚠ At this rate, the actual payment doesn\'t cover the interest due — increase the payment/overpayment or check your inputs.';
+    } else {
+      warnEl.style.display = 'none';
+    }
+
+    const monthsSaved = Math.max(0, scheduled.months - withOverpay.months);
+    const interestSaved = Math.max(0, scheduled.cumInterest - withOverpay.cumInterest);
+
+    $('statPayoff').textContent = fmtYM(withOverpay.months);
+    $('statTimeSaved').textContent = monthsSaved > 0 ? fmtYM(monthsSaved) : '—';
+    $('statInterestSaved').textContent = gbp(interestSaved);
+    $('statInterestScheduled').textContent = gbp(scheduled.cumInterest);
+    $('statInterestFinal').textContent = gbp(withOverpay.cumInterest);
+
+    // build a shared date-labelled x-axis long enough for the slowest scenario
+    // (normally "scheduled", but actual vs calculated payment can flip that)
+    const axisMonths = Math.max(scheduled.months, withOffset.months, withOverpay.months, 1);
+    const labels = [];
+    for(let m = 0; m <= axisMonths; m++){
+      const d = new Date(startYM.year, parseInt(startYM.month,10) - 1 + m, 1);
+      labels.push(d.toLocaleDateString('en-GB', {month:'short', year:'2-digit'}));
+    }
+    const step = axisMonths > 240 ? 24 : (axisMonths > 120 ? 12 : (axisMonths > 36 ? 6 : 3));
+    const displayLabels = labels.map((l, i) => (i % step === 0 || i === labels.length-1) ? l : '');
+
+    const schedPadded = padSeries(scheduled, axisMonths);
+    const offsetPadded = padSeries(withOffset, axisMonths);
+    const overpayPadded = padSeries(withOverpay, axisMonths);
+
+    balanceChart.data.labels = displayLabels;
+    balanceChart.data.datasets[0].data = schedPadded.balances;
+    balanceChart.data.datasets[1].data = offsetPadded.balances;
+    balanceChart.data.datasets[2].data = overpayPadded.balances;
+    balanceChart.update();
+
+    interestChart.data.labels = displayLabels;
+    interestChart.data.datasets[0].data = schedPadded.interestSeries;
+    interestChart.data.datasets[1].data = offsetPadded.interestSeries;
+    interestChart.data.datasets[2].data = overpayPadded.interestSeries;
+    interestChart.update();
+
+    const balanceNoteEl = $('balanceNote');
+    balanceNoteEl.textContent =
+      `At your actual payment of ${gbp(actualPayment)}/month — Scheduled: ${fmtYM(scheduled.months)} · With offset: ${fmtYM(withOffset.months)} · With offset + overpayment: ${fmtYM(withOverpay.months)}`;
+
+    lastResults = {
+      mortgageBalance,
+      offsetBalance,
+      houseValue: parseFloat($('houseValue').value) || 0,
+      ratePct,
+      calculatedPayment: payment,
+      actualPayment,
+      overpayment,
+      payoffMonths: withOverpay.months,
+      totalInterestScheduled: scheduled.cumInterest,
+      totalInterestFinal: withOverpay.cumInterest,
+      interestSaved,
+      monthsSaved,
+      stalledWarning: scheduled.stalled || withOffset.stalled || withOverpay.stalled,
+      series: {
+        scheduledBalances: schedPadded.balances,
+        offsetBalances: offsetPadded.balances,
+        overpayBalances: overpayPadded.balances
+      }
+    };
+
+    saveNow();
+  }
+
+  $('exportData').addEventListener('click', () => {
+    downloadJSON('mortgage-summary.json', {
+      tracker: 'mortgage',
+      exportedAt: new Date().toISOString(),
+      ...lastResults,
+      state: buildState()
+    });
+  });
+
+  ['startMonth','startYear','mortgageBalance','offsetBalance','houseValue','termYears','termMonths','rate','overpayment','actualPayment'].forEach(id => {
+    $(id).addEventListener('change', compute);
+    $(id).addEventListener('input', compute);
+  });
+
+  $('syncActual').addEventListener('click', () => {
+    const balance = parseFloat($('mortgageBalance').value) || 0;
+    const n = Math.max(1, (parseInt($('termYears').value,10)||0) * 12 + (parseInt($('termMonths').value,10)||0));
+    const monthlyRate = (parseFloat($('rate').value) || 0) / 100 / 12;
+    $('actualPayment').value = Math.round(calcPayment(balance, monthlyRate, n));
+    compute();
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    applyState(null);
+    compute();
+  });
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'mortgage'){
+          alert("That doesn't look like a summary file from this Mortgage tracker.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it from the other device first.');
+          return;
+        }
+        applyState(parsed.state);
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from this tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  initCharts();
+  compute();
+})();
+</script>
+</body>
+</html>
