@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Budget Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#160f20;
+    --panel:#20182e;
+    --panel-2:#281f3a;
+    --border:#3a2f52;
+    --text:#f3eefc;
+    --muted:#a89bc4;
+    --accent:#b98cff;
+    --accent-2:#ffd166;
+    --income:#2fd6a7;
+    --debits:#ffd166;
+    --savings:#4fc3f7;
+    --mortgage:#b98cff;
+    --surplus:#2fd6a7;
+    --deficit:#ff6b6b;
+    --warn:#ffb454;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #2a1f42 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  header h1{
+    font-size:1.7rem;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width: 920px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    margin-bottom:18px;
+  }
+  .card h2{
+    font-size:1rem;
+    margin:0 0 14px;
+    color:var(--text);
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card p.hint{color:var(--muted);font-size:0.8rem;margin:-8px 0 14px;}
+  label{
+    display:block;
+    font-size:0.82rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  .field{margin-bottom:16px;}
+  input[type="number"], input[type="text"]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.95rem;
+    outline:none;
+  }
+  input:focus{ border-color:var(--accent); }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .sublist{
+    display:flex;flex-direction:column;gap:8px;
+    margin-top:10px;
+  }
+  .sublist-item{
+    display:flex;align-items:center;gap:8px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:8px 10px;
+    font-size:0.85rem;
+  }
+  .sublist-item .meta{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .sublist-item .meta b{color:var(--text);}
+  .sublist-item .meta span{color:var(--muted);font-size:0.78rem;}
+  .remove-btn{
+    background:none;border:none;color:var(--deficit);
+    cursor:pointer;font-size:1.1rem;line-height:1;
+    padding:2px 6px;border-radius:6px;
+  }
+  .remove-btn:hover{background:rgba(255,107,107,0.15);}
+  .add-form{
+    display:grid;grid-template-columns:1.4fr 1fr auto;gap:8px;
+    margin-top:12px;align-items:end;
+  }
+  .add-form label{margin-bottom:4px;}
+  .add-form > div{min-width:0;}
+  button.add-btn{
+    background:var(--accent);
+    color:#160f20;
+    border:none;font-weight:700;
+    padding:9px 14px;border-radius:9px;
+    cursor:pointer;font-size:0.85rem;
+    white-space:nowrap;
+  }
+  button.add-btn:hover{filter:brightness(1.08);}
+  .empty-note{color:var(--muted);font-size:0.82rem;font-style:italic;}
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 760px){
+    .summary-grid{grid-template-columns:repeat(2,1fr);}
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px;
+  }
+  .stat .label{color:var(--muted);font-size:0.78rem;margin-bottom:6px;}
+  .stat .value{font-size:1.25rem;font-weight:700;}
+  .stat.income .value{color:var(--income);}
+  .stat.debits .value{color:var(--debits);}
+  .stat.neu .value{color:var(--text);}
+  .stat.surplus .value{color:var(--surplus);}
+  .stat.deficit .value{color:var(--deficit);}
+  .chart-card canvas{max-height:340px;}
+  .debits-chart-wrap{position:relative;width:100%;height:340px;}
+  .debits-chart-wrap canvas{max-height:none !important;}
+  .chart-note{
+    color:var(--muted);
+    font-size:0.8rem;
+    margin:10px 0 0;
+    text-align:center;
+  }
+  .warning{
+    background:rgba(255,107,107,0.12);
+    border:1px solid rgba(255,107,107,0.4);
+    color:var(--deficit);
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:0.82rem;
+    margin-bottom:14px;
+  }
+  .save-note{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;flex-wrap:wrap;
+    color:var(--muted);
+    font-size:0.78rem;
+    margin-top:20px;
+  }
+  .save-note button{
+    background:none;
+    border:1px solid var(--border);
+    color:var(--muted);
+    padding:6px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:0.78rem;
+  }
+  .save-note button:hover{color:var(--deficit);border-color:var(--deficit);}
+  footer{
+    text-align:center;color:var(--muted);
+    font-size:0.78rem;margin-top:20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand-logo" style="margin-bottom:14px;">
+      <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
+        <path d="M20 60 L43 38 L66 60" fill="none" stroke="#96a2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="27" y="60" width="32" height="18" fill="none" stroke="#96a2b8" stroke-width="2.5"/>
+        <path d="M18 70 L32 58 L44 66 L60 44" fill="none" stroke="#2fd6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="60" cy="44" r="3.5" fill="#2fd6a7"/>
+        <text x="97" y="52" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="30" font-weight="700" fill="#eaeef4">Phillips<tspan fill="#4fc3f7"> Finance</tspan></text>
+        <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
+      </svg>
+    </div>
+    <h1>🧾 Monthly Budget Tracker</h1>
+    <p>Net take-home income, direct debits, and what's already committed to your ISA and mortgage each month.</p>
+  </header>
+
+  <div class="layout">
+    <!-- CONTROLS -->
+    <div>
+      <div class="card">
+        <h2><span class="dot" style="background:var(--income)"></span>Monthly income (net)</h2>
+        <p class="hint">Take-home pay after tax — yours, a partner's, or any other regular income.</p>
+        <div id="incomeList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>Source</label>
+            <input type="text" id="incomeName" placeholder="e.g. Salary">
+          </div>
+          <div>
+            <label>Amount (£)</label>
+            <input type="number" id="incomeAmount" placeholder="e.g. 2500" min="0" step="10">
+          </div>
+          <button class="add-btn" id="addIncome" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot" style="background:var(--debits)"></span>Direct debits &amp; bills</h2>
+        <p class="hint">Rent/council tax, utilities, insurance, subscriptions, etc.</p>
+        <div id="debitList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>Bill</label>
+            <input type="text" id="debitName" placeholder="e.g. Council tax">
+          </div>
+          <div>
+            <label>Amount (£)</label>
+            <input type="number" id="debitAmount" placeholder="e.g. 150" min="0" step="5">
+          </div>
+          <button class="add-btn" id="addDebit" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot" style="background:var(--savings)"></span>Savings &amp; mortgage</h2>
+        <div class="field">
+          <label for="isaAmount">ISA contribution (£/month)</label>
+          <input type="number" id="isaAmount" value="150" min="0" step="10">
+        </div>
+        <p class="hint" style="margin-top:-6px;">Matches your ISA tracker's monthly contribution — for now, enter it manually here; it'll link automatically once we build the dashboard.</p>
+        <div class="field" style="margin-bottom:0;">
+          <label for="mortgageAmount">Mortgage payment (£/month)</label>
+          <input type="number" id="mortgageAmount" value="1166" min="0" step="10">
+        </div>
+        <p class="hint" style="margin-top:6px;margin-bottom:0;">Matches your mortgage tracker's standard payment (plus any overpayment) — same story, manual for now.</p>
+      </div>
+
+      <div class="save-note">
+        <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+        <span style="display:flex;gap:8px;">
+          <button id="exportData" type="button">⬇ Export summary</button>
+          <button id="clearSaved" type="button">Reset to defaults</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div>
+      <div id="deficitWarning" class="warning" style="display:none;"></div>
+
+      <div class="summary-grid">
+        <div class="stat income">
+          <div class="label">Total monthly income</div>
+          <div class="value" id="statIncome">£0</div>
+        </div>
+        <div class="stat debits">
+          <div class="label">Direct debits &amp; bills</div>
+          <div class="value" id="statDebits">£0</div>
+        </div>
+        <div class="stat neu">
+          <div class="label">ISA + mortgage</div>
+          <div class="value" id="statCommitted">£0</div>
+        </div>
+        <div class="stat surplus" id="statLeftoverCard">
+          <div class="label">Left over each month</div>
+          <div class="value" id="statLeftover">£0</div>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Where your income goes</h2>
+        <canvas id="allocationChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot" style="background:var(--debits)"></span>Direct debits breakdown</h2>
+        <div class="debits-chart-wrap" id="debitsChartWrap">
+          <canvas id="debitsChart"></canvas>
+        </div>
+        <p class="chart-note" id="debitsNote"></p>
+      </div>
+    </div>
+  </div>
+
+  <footer>Simple monthly snapshot — not financial advice. Figures are entered manually; the ISA and mortgage amounts are meant to match your other trackers by hand for now. Doesn't account for irregular/annual costs, tax changes, or income that varies month to month.</footer>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'budgetTracker.state.v1';
+  const $ = id => document.getElementById(id);
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  let incomeItems = [];
+  let debitItems = [];
+  let lastResults = {};  // populated at the end of compute(), read by the export button
+
+  function downloadJSON(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function saveNow(){
+    try{
+      const state = {
+        incomeItems,
+        debitItems,
+        isaAmount: $('isaAmount').value,
+        mortgageAmount: $('mortgageAmount').value
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const status = $('saveStatus');
+      if(status){
+        status.textContent = 'Saved just now in this browser.';
+        clearTimeout(saveNow._t);
+        saveNow._t = setTimeout(() => {
+          status.textContent = 'Your inputs are saved automatically in this browser.';
+        }, 1500);
+      }
+    }catch(e){ /* localStorage unavailable */ }
+  }
+
+  const saved = loadSaved();
+  incomeItems = (saved && Array.isArray(saved.incomeItems)) ? saved.incomeItems : [{name:'Salary (net)', amount:2500}];
+  debitItems = (saved && Array.isArray(saved.debitItems)) ? saved.debitItems : [];
+  $('isaAmount').value = (saved && saved.isaAmount) != null ? saved.isaAmount : 150;
+  $('mortgageAmount').value = (saved && saved.mortgageAmount) != null ? saved.mortgageAmount : 1166;
+
+  function gbp(n){
+    return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits:0});
+  }
+
+  // ---------- chart instances ----------
+  let allocationChart, debitsChart;
+  const gridColor = 'rgba(255,255,255,0.06)';
+  Chart.defaults.color = '#a89bc4';
+  Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
+
+  function initCharts(){
+    const actx = $('allocationChart').getContext('2d');
+    allocationChart = new Chart(actx, {
+      type:'doughnut',
+      data:{
+        labels:['Direct debits','ISA','Mortgage','Left over'],
+        datasets:[{
+          data:[0,0,0,0],
+          backgroundColor:['#ffd166','#4fc3f7','#b98cff','#2fd6a7'],
+          borderColor:'#20182e',
+          borderWidth:3
+        }]
+      },
+      options:{
+        responsive:true,
+        plugins:{
+          legend:{position:'bottom', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.label + ': ' + gbp(ctx.parsed)}}
+        },
+        cutout:'62%'
+      }
+    });
+
+    const dctx = $('debitsChart').getContext('2d');
+    debitsChart = new Chart(dctx, {
+      type:'bar',
+      data:{
+        labels:[],
+        datasets:[{
+          label:'Monthly amount',
+          data:[],
+          backgroundColor:'#ffd166',
+          borderRadius:6
+        }]
+      },
+      options:{
+        indexAxis:'y',
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx => gbp(ctx.parsed.x)}}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, ticks:{callback:v => '£' + v}, beginAtZero:true},
+          y:{grid:{display:false}, ticks:{autoSkip:false}}
+        }
+      }
+    });
+  }
+
+  // ---------- render sublists ----------
+  function renderIncomeList(){
+    const el = $('incomeList');
+    if(incomeItems.length === 0){
+      el.innerHTML = '<div class="empty-note">No income sources added yet.</div>';
+      return;
+    }
+    el.innerHTML = incomeItems.map((item, idx) => `
+      <div class="sublist-item">
+        <div class="meta"><span>${item.name}</span><b>${gbp(item.amount)}</b></div>
+        <button class="remove-btn" data-type="income" data-idx="${idx}">✕</button>
+      </div>`).join('');
+  }
+
+  function renderDebitList(){
+    const el = $('debitList');
+    if(debitItems.length === 0){
+      el.innerHTML = '<div class="empty-note">No direct debits added yet.</div>';
+      return;
+    }
+    el.innerHTML = debitItems.map((item, idx) => `
+      <div class="sublist-item">
+        <div class="meta"><span>${item.name}</span><b>${gbp(item.amount)}</b></div>
+        <button class="remove-btn" data-type="debit" data-idx="${idx}">✕</button>
+      </div>`).join('');
+  }
+
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-btn');
+    if(!btn) return;
+    const idx = Number(btn.dataset.idx);
+    if(btn.dataset.type === 'income'){
+      incomeItems.splice(idx,1);
+      renderIncomeList();
+    } else {
+      debitItems.splice(idx,1);
+      renderDebitList();
+    }
+    compute();
+  });
+
+  $('addIncome').addEventListener('click', () => {
+    const name = $('incomeName').value.trim();
+    const amount = parseFloat($('incomeAmount').value);
+    if(!name || !amount || amount <= 0){ return; }
+    incomeItems.push({name, amount});
+    $('incomeName').value = '';
+    $('incomeAmount').value = '';
+    renderIncomeList();
+    compute();
+  });
+
+  $('addDebit').addEventListener('click', () => {
+    const name = $('debitName').value.trim();
+    const amount = parseFloat($('debitAmount').value);
+    if(!name || !amount || amount <= 0){ return; }
+    debitItems.push({name, amount});
+    $('debitName').value = '';
+    $('debitAmount').value = '';
+    renderDebitList();
+    compute();
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    incomeItems = [{name:'Salary (net)', amount:2500}];
+    debitItems = [];
+    $('isaAmount').value = 150;
+    $('mortgageAmount').value = 1166;
+    renderIncomeList();
+    renderDebitList();
+    compute();
+  });
+
+  function compute(){
+    const totalIncome = incomeItems.reduce((s,i) => s + i.amount, 0);
+    const totalDebits = debitItems.reduce((s,i) => s + i.amount, 0);
+    const isaAmount = parseFloat($('isaAmount').value) || 0;
+    const mortgageAmount = parseFloat($('mortgageAmount').value) || 0;
+    const totalCommitted = totalDebits + isaAmount + mortgageAmount;
+    const leftover = totalIncome - totalCommitted;
+
+    $('statIncome').textContent = gbp(totalIncome);
+    $('statDebits').textContent = gbp(totalDebits);
+    $('statCommitted').textContent = gbp(isaAmount + mortgageAmount);
+
+    const leftoverCard = $('statLeftoverCard');
+    leftoverCard.className = 'stat ' + (leftover >= 0 ? 'surplus' : 'deficit');
+    $('statLeftover').textContent = (leftover >= 0 ? '' : '-') + gbp(Math.abs(leftover));
+
+    const warnEl = $('deficitWarning');
+    if(leftover < 0){
+      warnEl.style.display = 'block';
+      warnEl.textContent = `⚠ You're committing ${gbp(Math.abs(leftover))} more than you bring in each month, based on the figures entered.`;
+    } else {
+      warnEl.style.display = 'none';
+    }
+
+    // allocation doughnut: only include a "left over" slice if it's positive
+    const allocLabels = ['Direct debits','ISA','Mortgage'];
+    const allocData = [totalDebits, isaAmount, mortgageAmount];
+    const allocColors = ['#ffd166','#4fc3f7','#b98cff'];
+    if(leftover > 0){
+      allocLabels.push('Left over');
+      allocData.push(leftover);
+      allocColors.push('#2fd6a7');
+    }
+    allocationChart.data.labels = allocLabels;
+    allocationChart.data.datasets[0].data = allocData;
+    allocationChart.data.datasets[0].backgroundColor = allocColors;
+    allocationChart.update();
+
+    // direct debits breakdown, largest first — grow the chart's height with
+    // the number of bills so labels never get cramped
+    const sortedDebits = debitItems.slice().sort((a,b) => b.amount - a.amount);
+    const debitsWrap = $('debitsChartWrap');
+    debitsWrap.style.height = Math.max(340, 60 + sortedDebits.length * 34) + 'px';
+    debitsChart.data.labels = sortedDebits.map(d => d.name);
+    debitsChart.data.datasets[0].data = sortedDebits.map(d => d.amount);
+    debitsChart.resize();
+    debitsChart.update();
+    $('debitsNote').textContent = debitItems.length === 0 ? 'Add a direct debit to see the breakdown.' : '';
+
+    lastResults = {
+      totalIncome,
+      totalDebits,
+      isaAmount,
+      mortgageAmount,
+      leftover,
+      deficitWarning: leftover < 0,
+      allocation: {
+        labels: allocLabels,
+        data: allocData,
+        colors: allocColors
+      }
+    };
+
+    saveNow();
+  }
+
+  $('exportData').addEventListener('click', () => {
+    downloadJSON('budget-summary.json', {
+      tracker: 'budget',
+      exportedAt: new Date().toISOString(),
+      ...lastResults
+    });
+  });
+
+  ['isaAmount','mortgageAmount'].forEach(id => {
+    $(id).addEventListener('change', compute);
+    $(id).addEventListener('input', compute);
+  });
+
+  initCharts();
+  renderIncomeList();
+  renderDebitList();
+  compute();
+})();
+</script>
+</body>
+</html>
