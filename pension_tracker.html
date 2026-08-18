@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pension Growth Tracker</title>
+<title>Retirement Planner</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{
@@ -20,6 +20,7 @@
     --high:#2fd6a7;
     --warn:#ffb454;
     --danger:#ff6b6b;
+    --savings:#ff8fa3;
     --radius:14px;
   }
   *{box-sizing:border-box;}
@@ -80,7 +81,14 @@
     margin-bottom:6px;
   }
   .field{margin-bottom:16px;}
-  input[type="number"], input[type="text"]{
+  .checkbox-row{
+    display:flex;align-items:center;gap:7px;
+    margin-top:10px;font-size:0.82rem;color:var(--muted);cursor:pointer;
+  }
+  .checkbox-row input[type="checkbox"]{width:auto;}
+  .sublist-item.warn{background:rgba(255,107,107,0.08);border-color:rgba(255,107,107,0.4);}
+  .sublist-item.warn .meta b{color:var(--danger);}
+  input[type="number"], input[type="text"], input[type="date"]{
     width:100%;
     background:var(--panel-2);
     border:1px solid var(--border);
@@ -89,8 +97,14 @@
     border-radius:9px;
     font-size:0.95rem;
     outline:none;
+    color-scheme:dark;
   }
-  input[type="number"]:focus{ border-color:var(--accent); }
+  input[type="number"]:focus, input[type="text"]:focus, input[type="date"]:focus{ border-color:var(--accent); }
+  /* Hide native spin buttons — in narrow columns (e.g. "Year", "Starts at age") they ate enough
+     width to clip the value itself. Scroll wheel / keyboard up-down still work. */
+  input[type="number"]{-moz-appearance:textfield;}
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
   .slider-row{
@@ -120,6 +134,85 @@
     font-weight:700;font-size:1rem;
     color:var(--accent);
   }
+  .alloc-fill-row{margin-bottom:12px;}
+  .alloc-fill-inputs{
+    display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;
+  }
+  .alloc-fill-inputs input{text-align:center;}
+  .alloc-table-wrap{
+    max-height:320px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:9px;
+  }
+  /* matches .alloc-table-wrap's cap so the Drawdown allocation and Other income cards, sat
+     side by side, end at roughly the same height instead of one running on indefinitely */
+  .sublist.tax-check-wrap{
+    max-height:320px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:9px;
+    padding:8px;margin-top:10px;
+  }
+  .tax-check-wrap .sublist-item:last-child{margin-bottom:0;}
+  table.alloc-table{
+    width:100%;border-collapse:collapse;font-size:0.85rem;
+  }
+  .alloc-table thead th{
+    position:sticky;top:0;background:var(--panel-2);
+    color:var(--muted);font-weight:600;font-size:0.75rem;
+    text-align:center;padding:8px 6px;border-bottom:1px solid var(--border);
+    z-index:1;
+  }
+  .alloc-table thead th:first-child{text-align:left;padding-left:10px;}
+  .alloc-table tbody td{
+    padding:5px 6px;text-align:center;border-bottom:1px solid var(--border);
+  }
+  .alloc-table tbody tr:last-child td{border-bottom:none;}
+  .alloc-table tbody td:first-child{text-align:left;padding-left:10px;color:var(--muted);}
+  .alloc-table .alloc-input{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:6px 4px;border-radius:7px;font-size:0.85rem;
+    text-align:center;outline:none;
+  }
+  .alloc-table .alloc-input:focus{border-color:var(--accent);}
+  .alloc-table .alloc-sum{color:var(--muted);font-variant-numeric:tabular-nums;}
+  .alloc-table tr.alloc-warn .alloc-sum{color:var(--danger);font-weight:700;}
+  .alloc-table tr.alloc-warn{background:rgba(255,107,107,0.06);}
+  .history-table-wrap{
+    max-height:320px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:9px;
+    margin-top:10px;
+  }
+  table.history-table{
+    width:100%;border-collapse:collapse;font-size:0.85rem;
+  }
+  .history-table thead th{
+    position:sticky;top:0;background:var(--panel-2);
+    color:var(--muted);font-weight:600;font-size:0.75rem;
+    text-align:center;padding:8px 6px;border-bottom:1px solid var(--border);
+    z-index:1;
+  }
+  .history-table thead th:first-child{text-align:left;padding-left:10px;}
+  .history-table tbody td{
+    padding:5px 6px;text-align:center;border-bottom:1px solid var(--border);
+  }
+  .history-table tbody tr:last-child td{border-bottom:none;}
+  .history-table tbody td:first-child{text-align:left;padding-left:10px;color:var(--text);font-weight:600;}
+  .history-table .hist-input{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--text);padding:6px 4px;border-radius:7px;font-size:0.85rem;
+    text-align:center;outline:none;
+  }
+  .history-table .hist-input:focus{border-color:var(--accent);}
+  .history-table .hist-return{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600;}
+  .history-table .hist-return.pos{color:var(--high);}
+  .history-table .hist-return.neg{color:var(--danger);}
+  .history-add-form{
+    display:grid;grid-template-columns:1fr 0.8fr 1fr 1.2fr auto;gap:8px;
+    margin-top:12px;align-items:end;
+  }
+  .history-add-form label{margin-bottom:4px;}
+  .history-add-form > div{min-width:0;}
+  @media (max-width: 760px){
+    .history-add-form{grid-template-columns:1fr 1fr;}
+  }
   .sublist{
     display:flex;flex-direction:column;gap:8px;
     margin-top:10px;
@@ -145,6 +238,11 @@
     display:grid;grid-template-columns:1.3fr 0.9fr 1fr auto;gap:8px;
     margin-top:12px;align-items:end;
   }
+  .add-form.add-form-5{grid-template-columns:1fr 0.9fr 0.9fr 0.9fr auto;}
+  .add-form.add-form-3{grid-template-columns:1.3fr 1fr auto;}
+  .funding-add-form{margin-top:12px;}
+  .funding-add-form .row3{margin-bottom:10px;}
+  .funding-add-form .add-btn{width:100%;}
   .add-form label{margin-bottom:4px;}
   .add-form > div{min-width:0;}
   .month-year{
@@ -159,11 +257,12 @@
     background:var(--panel-2);
     border:1px solid var(--border);
     color:var(--text);
-    padding:9px 11px;
+    padding:9px 6px;
     border-radius:9px;
-    font-size:0.95rem;
+    font-size:0.85rem;
     outline:none;
     cursor:pointer;
+    text-overflow:ellipsis;
   }
   select:focus{border-color:var(--accent);}
   button.add-btn{
@@ -212,10 +311,16 @@
     color:var(--text);
     margin:0 0 14px;
   }
-  .section-title.spend{
+  .section-title.spend, .section-title.retire, .section-title.drawdown{
     margin-top:8px;
     padding-top:26px;
     border-top:1px solid var(--border);
+  }
+  .subtle-field{
+    display:none;
+  }
+  .subtle-field.show{
+    display:block;
   }
   .stat.low .value{color:var(--low);}
   .stat.med .value{color:var(--med);}
@@ -233,6 +338,26 @@
   @media (max-width: 760px){
     .summary-grid-2{grid-template-columns:1fr;}
   }
+  .summary-grid-3{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    margin-bottom:18px;
+  }
+  @media (max-width: 900px){
+    .summary-grid-3{grid-template-columns:1fr;}
+  }
+  .grid-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+    gap:20px;
+    align-items:start;
+    margin-bottom:18px;
+  }
+  .grid-cards.grid-cards-2{
+    grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+  }
+  .grid-cards .card{margin-bottom:0;}
   .card a{color:var(--accent-2);}
   .chart-note{
     color:var(--muted);
@@ -259,6 +384,17 @@
     font-size:0.82rem;
     margin-bottom:14px;
   }
+  .mini-output{
+    margin-top:14px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:10px 12px;
+    font-size:0.85rem;
+    color:var(--text);
+    line-height:1.7;
+  }
+  .mini-output b{color:var(--accent);}
   .save-note{
     display:flex;align-items:center;justify-content:space-between;
     gap:10px;flex-wrap:wrap;
@@ -297,62 +433,98 @@
         <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
       </svg>
     </div>
-    <h1>🏛️ Pension Growth Tracker</h1>
-    <p>Project your pension pot to retirement using your salary, contributions, one-off payments, and expected pay rises.</p>
+    <h1>🏛️ Retirement Planner</h1>
+    <p>Project your whole retirement picture — live DC pension, dormant pots, DB pensions, savings &amp; ISAs and the State Pension — from today through to the income you'll draw in retirement.</p>
   </header>
 
-  <h2 class="section-title">🏦 Your pension</h2>
-  <div class="layout">
-    <!-- CONTROLS -->
-    <div>
+  <h2 class="section-title">🏦 Building your pension</h2>
+
+  <div class="card">
+    <h2><span class="dot"></span>Live DC pension — history &amp; starting point</h2>
+    <p class="hint">Your current active workplace or personal DC scheme. Log each actual valuation from your annual statement below to build a genuine track record — your balance today isn't just a static number, it's the result of contributions <em>and</em> investment growth over the years. The most recent entry becomes the starting point for every projection below.</p>
+    <div class="row2">
+      <div class="field">
+        <label for="dob">Date of birth</label>
+        <input type="date" id="dob">
+      </div>
+      <div class="field">
+        <label for="retireAge">Planned retirement age</label>
+        <input type="number" id="retireAge" value="65" min="17" max="85" step="0.5">
+      </div>
+    </div>
+    <div class="field">
+      <label for="salary">Annual salary (£)</label>
+      <input type="number" id="salary" value="35000" min="0" step="500">
+    </div>
+    <div class="row2" style="margin-bottom:0;">
+      <div class="field" style="margin-bottom:0;">
+        <label for="employeePct">Your contribution (%)</label>
+        <input type="number" id="employeePct" value="5" min="0" max="100" step="0.5">
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="employerPct">Employer contribution (%)</label>
+        <input type="number" id="employerPct" value="3" min="0" max="100" step="0.5">
+      </div>
+    </div>
+
+    <p class="hint" style="margin:16px 0 6px;font-weight:600;color:var(--text);">Valuation history</p>
+    <p class="hint" style="margin-top:0;">One row per statement, in date order — usually annual, at the same point in your financial year. "Paid in this period" is what went in (you + employer + any lump sums) since the previous row; "Implied return" backs out the investment growth after removing that contribution (Simple Dietz method — assumes contributions land evenly through the period). The first row is your starting value, so it has no contribution or return figure. Use "Add a year" each time you get a new valuation, so this keeps building into a genuine long-run track record rather than a one-off snapshot.</p>
+    <div class="history-table-wrap">
+      <table class="history-table" id="historyTable">
+        <thead><tr><th>Date</th><th>Pension value</th><th>Paid in this period</th><th>Implied return this period</th><th></th></tr></thead>
+        <tbody id="historyTableBody"></tbody>
+      </table>
+    </div>
+    <div class="history-add-form">
+      <div>
+        <label>Month</label>
+        <select id="histMonth"></select>
+      </div>
+      <div>
+        <label>Year</label>
+        <input type="number" id="histYear" min="2000" max="2100" step="1">
+      </div>
+      <div>
+        <label>Pension value (£)</label>
+        <input type="number" id="histValue" placeholder="e.g. 85000" min="0" step="100">
+      </div>
+      <div>
+        <label>Paid in since last entry (£)</label>
+        <input type="number" id="histPaidIn" placeholder="e.g. 5000" min="0" step="50">
+      </div>
+      <button class="add-btn" id="addHistory" type="button">Add a year</button>
+    </div>
+    <div class="mini-output" id="historyGrowthNote" style="margin-top:14px;">
+      Add at least two valuations to see the implied growth rate for your most recent year.
+    </div>
+    <button class="add-btn" id="applyHighGrowth" type="button" style="margin-top:10px;display:none;">Use as High growth rate</button>
+  </div>
+
+  <div class="grid-cards">
       <div class="card">
-        <h2><span class="dot"></span>Starting point</h2>
-        <div class="field">
-          <label>Balance as of</label>
-          <div class="month-year">
-            <select id="startMonth"></select>
-            <input type="number" id="startYear" min="2000" max="2100" step="1">
+        <h2><span class="dot" style="background:var(--accent-2)"></span>Scheduled pay rises</h2>
+        <p class="hint">Add a pay rise, promotion, or new job on a set date, as a % increase on your salary at that point. Each one compounds on top of the last scheduled rise (or your starting salary, if it's the first).</p>
+        <div id="salChgList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>From month</label>
+            <select id="salChgMonth"></select>
           </div>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label for="startingBalance">Current pension balance (£)</label>
-            <input type="number" id="startingBalance" value="0" min="0" step="100">
+          <div>
+            <label>Year</label>
+            <input type="number" id="salChgYear" min="2000" max="2100" step="1">
           </div>
-          <div class="field">
-            <label for="dob">Date of birth</label>
-            <input type="date" id="dob">
+          <div>
+            <label>Pay rise (%)</label>
+            <input type="number" id="salChgPct" placeholder="e.g. 5" min="0.1" max="200" step="0.1">
           </div>
-        </div>
-        <div class="field">
-          <label for="retireAge">Planned retirement age</label>
-          <input type="number" id="retireAge" value="65" min="17" max="85" step="0.5">
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label for="salary">Annual salary (£)</label>
-            <input type="number" id="salary" value="35000" min="0" step="500">
-          </div>
-          <div class="field">
-            <label for="payRise">Expected annual pay rise (%)</label>
-            <input type="number" id="payRise" value="2.5" min="0" max="15" step="0.1">
-          </div>
-        </div>
-        <div class="row2" style="margin-bottom:0;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="employeePct">Your contribution (%)</label>
-            <input type="number" id="employeePct" value="5" min="0" max="100" step="0.5">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="employerPct">Employer contribution (%)</label>
-            <input type="number" id="employerPct" value="3" min="0" max="100" step="0.5">
-          </div>
+          <button class="add-btn" id="addSalChg" type="button">Add</button>
         </div>
       </div>
 
       <div class="card">
         <h2><span class="dot" style="background:var(--accent-2)"></span>One-off lump sums</h2>
-        <p class="hint">Bonus sacrifice, transfers in, tax refunds, etc.</p>
+        <p class="hint">Bonus sacrifice, transfers in, tax refunds, etc. — paid into your live DC scheme.</p>
         <div id="lumpList" class="sublist"></div>
         <div class="add-form">
           <div>
@@ -373,7 +545,7 @@
 
       <div class="card">
         <h2><span class="dot" style="background:var(--accent-2)"></span>Future contribution changes</h2>
-        <p class="hint">Schedule a change to your combined contribution % (e.g. after a promotion). Salary itself grows automatically each year by the pay rise % above.</p>
+        <p class="hint">Schedule a change to your combined contribution % (e.g. after a promotion). Salary stays flat unless you add a scheduled pay rise above.</p>
         <div id="changeList" class="sublist"></div>
         <div class="add-form">
           <div>
@@ -391,98 +563,242 @@
           <button class="add-btn" id="addChange" type="button">Add</button>
         </div>
       </div>
+  </div>
 
+  <div id="allowanceWarning" class="warning" style="display:none;"></div>
+
+  <div class="summary-grid">
+    <div class="stat neu">
+      <div class="label">Total paid in (incl. dormant pots)</div>
+      <div class="value" id="statContrib">£0</div>
+    </div>
+    <div class="stat low">
+      <div class="label-row">
+        <span class="label">Pension total — low growth</span>
+        <span class="pct-input"><input type="number" id="lowGrowth" value="3" min="0" max="15" step="0.1">%</span>
+      </div>
+      <div class="value" id="statLow">£0</div>
+    </div>
+    <div class="stat med">
+      <div class="label-row">
+        <span class="label">Pension total — medium growth</span>
+        <span class="pct-input"><input type="number" id="medGrowth" value="5" min="0" max="15" step="0.1">%</span>
+      </div>
+      <div class="value" id="statMed">£0</div>
+    </div>
+    <div class="stat high">
+      <div class="label-row">
+        <span class="label">Pension total — high growth</span>
+        <span class="pct-input"><input type="number" id="highGrowth" value="7" min="0" max="50" step="0.1">%</span>
+      </div>
+      <div class="value" id="statHigh">£0</div>
+    </div>
+  </div>
+
+  <div class="card chart-card">
+    <h2><span class="dot"></span>Live DC pension growth over time</h2>
+    <canvas id="growthChart"></canvas>
+    <p class="chart-note">Shows your live scheme only — the purple markers are your logged valuation history (actual figures), the shaded bands are the low/medium/high projection from today, and the dashed line is your true total contributed throughout (history + projected future). The totals above and the retirement charts below also include your dormant pots, growing at the same rates.</p>
+  </div>
+
+  <div class="charts-row">
+    <div class="card chart-card">
+      <h2><span class="dot" style="background:var(--med)"></span>Contributions vs. growth by year <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(live scheme, actual history + medium scenario)</span></h2>
+      <canvas id="barChart"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h2><span class="dot" style="background:var(--warn)"></span>Final breakdown <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(all pensions, medium)</span></h2>
+      <canvas id="doughnutChart"></canvas>
+    </div>
+  </div>
+
+  <h2 class="section-title retire">🔄 At retirement</h2>
+
+  <div class="summary-grid-3">
+    <div class="stat low">
+      <div class="label">Total wealth — low growth</div>
+      <div class="value" id="statWealthLow">£0</div>
+    </div>
+    <div class="stat med">
+      <div class="label">Total wealth — medium growth</div>
+      <div class="value" id="statWealthMed">£0</div>
+    </div>
+    <div class="stat high">
+      <div class="label">Total wealth — high growth</div>
+      <div class="value" id="statWealthHigh">£0</div>
+    </div>
+  </div>
+
+  <div class="grid-cards">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--accent-2)"></span>Dormant / other DC pensions</h2>
+      <p class="hint">Old workplace pensions you're no longer paying into. Left untouched, they keep compounding at the same low/medium/high rates as your live scheme, and are folded into the totals at retirement.</p>
+      <div id="dormantList" class="sublist"></div>
+      <div class="add-form add-form-5">
+        <div>
+          <label>Scheme name</label>
+          <input type="text" id="dormantName" placeholder="e.g. Old employer">
+        </div>
+        <div>
+          <label>Valuation month</label>
+          <select id="dormantMonth"></select>
+        </div>
+        <div>
+          <label>Year</label>
+          <input type="number" id="dormantYear" min="1970" max="2100" step="1">
+        </div>
+        <div>
+          <label>Balance (£)</label>
+          <input type="number" id="dormantBalance" placeholder="e.g. 15000" min="1" step="100">
+        </div>
+        <button class="add-btn" id="addDormant" type="button">Add</button>
+      </div>
     </div>
 
-    <!-- RESULTS -->
-    <div>
-      <div id="allowanceWarning" class="warning" style="display:none;"></div>
+    <div class="card">
+      <h2><span class="dot" style="background:var(--accent-2)"></span>Defined Benefit (DB) pensions</h2>
+      <p class="hint">Final-salary schemes, annuities, or other guaranteed income on top of the State Pension. Add one row per scheme.</p>
+      <div id="dbList" class="sublist"></div>
+      <div class="add-form add-form-5">
+        <div>
+          <label>Scheme name</label>
+          <input type="text" id="dbName" placeholder="e.g. Local Gov Pension">
+        </div>
+        <div>
+          <label>Income (£/yr)</label>
+          <input type="number" id="dbAmount" placeholder="e.g. 4000" min="1" step="50">
+        </div>
+        <div>
+          <label>Starts at age</label>
+          <input type="number" id="dbStartAge" placeholder="65" min="50" max="80" step="1">
+        </div>
+        <div></div>
+        <button class="add-btn" id="addDb" type="button">Add</button>
+      </div>
+      <div class="field" id="dbLumpWrap" style="margin-top:10px;margin-bottom:0;">
+        <label for="dbLumpTaken" id="dbLumpLabel">Tax-free lump sum taken (or planned) with this scheme, if any</label>
+        <div class="row2" style="gap:8px;">
+          <input type="number" id="dbLumpTaken" value="0" min="0" step="1">
+          <select id="dbLumpMode">
+            <option value="gbp">£ amount</option>
+            <option value="pct">% of Lump Sum Allowance</option>
+          </select>
+        </div>
+        <p class="hint" id="dbLumpPreview" style="margin:6px 0 0;"></p>
+      </div>
+    </div>
 
-      <div class="summary-grid">
-        <div class="stat neu">
-          <div class="label">Total contributed by retirement</div>
-          <div class="value" id="statContrib">£0</div>
+    <div class="card">
+      <h2><span class="dot" style="background:var(--savings)"></span>Savings &amp; ISAs</h2>
+      <p class="hint">Cash savings and Stocks &amp; Shares/Cash ISAs, tracked as two separate pots outside your pensions — accessible any time, and drawn on alongside your pension in retirement.</p>
+      <p class="hint" style="margin-top:-8px;font-weight:600;color:var(--text);">Savings</p>
+      <div class="row2">
+        <div class="field" style="margin-bottom:0;">
+          <label for="savingsBalance">Current balance (£)</label>
+          <input type="number" id="savingsBalance" value="0" min="0" step="100">
         </div>
-        <div class="stat low">
-          <div class="label-row">
-            <span class="label">Pot — low growth</span>
-            <span class="pct-input"><input type="number" id="lowGrowth" value="3" min="0" max="15" step="0.1">%</span>
-          </div>
-          <div class="value" id="statLow">£0</div>
-        </div>
-        <div class="stat med">
-          <div class="label-row">
-            <span class="label">Pot — medium growth</span>
-            <span class="pct-input"><input type="number" id="medGrowth" value="5" min="0" max="15" step="0.1">%</span>
-          </div>
-          <div class="value" id="statMed">£0</div>
-        </div>
-        <div class="stat high">
-          <div class="label-row">
-            <span class="label">Pot — high growth</span>
-            <span class="pct-input"><input type="number" id="highGrowth" value="7" min="0" max="15" step="0.1">%</span>
-          </div>
-          <div class="value" id="statHigh">£0</div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="savingsMonthly">Monthly contribution (£)</label>
+          <input type="number" id="savingsMonthly" value="0" min="0" step="10">
         </div>
       </div>
-
-      <div class="card chart-card">
-        <h2><span class="dot"></span>Pension growth over time</h2>
-        <canvas id="growthChart"></canvas>
-      </div>
-
-      <div class="charts-row">
-        <div class="card chart-card">
-          <h2><span class="dot" style="background:var(--med)"></span>Contributions vs. growth by year <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario)</span></h2>
-          <canvas id="barChart"></canvas>
+      <button class="add-btn" id="importSavingsBtn" type="button" style="margin-top:8px;">⬇ Import from Savings tracker</button>
+      <input type="file" id="importSavingsFile" accept=".json" hidden>
+      <p class="hint" id="savingsImportNote" style="margin:6px 0 0;"></p>
+      <p class="hint" style="margin:14px 0 8px;font-weight:600;color:var(--text);">ISA</p>
+      <div class="row2" style="margin-bottom:0;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="isaBalance">Current balance (£)</label>
+          <input type="number" id="isaBalance" value="0" min="0" step="100">
         </div>
-        <div class="card chart-card">
-          <h2><span class="dot" style="background:var(--warn)"></span>Final breakdown <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium)</span></h2>
-          <canvas id="doughnutChart"></canvas>
+        <div class="field" style="margin-bottom:0;">
+          <label for="isaMonthly">Monthly contribution (£)</label>
+          <input type="number" id="isaMonthly" value="0" min="0" step="10">
         </div>
       </div>
+      <button class="add-btn" id="importIsaBtn" type="button" style="margin-top:8px;">⬇ Import from ISA tracker</button>
+      <input type="file" id="importIsaFile" accept=".json" hidden>
+      <p class="hint" id="isaImportNote" style="margin:6px 0 0;"></p>
+      <p class="hint" style="margin:14px 0 8px;">ISA growth rate — set your own, independent of your pension's low/medium/high assumptions above (e.g. if it's invested more or less aggressively). Ignored while an imported ISA projection is active.</p>
+      <div class="row3">
+        <div class="field" style="margin-bottom:0;">
+          <label for="isaLowGrowth">Low (%)</label>
+          <input type="number" id="isaLowGrowth" value="3" min="0" max="20" step="0.1">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="isaMedGrowth">Medium (%)</label>
+          <input type="number" id="isaMedGrowth" value="5" min="0" max="20" step="0.1">
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="isaHighGrowth">High (%)</label>
+          <input type="number" id="isaHighGrowth" value="7" min="0" max="50" step="0.1">
+        </div>
+      </div>
+      <div class="mini-output" id="savingsOutput" style="margin-top:10px;">Projected at retirement: £0</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--savings)"></span>Tax-free lump sum</h2>
+      <p class="hint">UK pensions normally let you take up to 25% of your DC pot as a tax-free lump sum when you retire, up to the Lump Sum Allowance (£268,275 for 2026/27) — minus any tax-free cash already taken from the DB schemes above. Moving it into savings makes it accessible immediately, outside pension rules; the rest stays invested and is drawn down as pension.</p>
+      <div class="field" style="margin-bottom:0;">
+        <label for="tfcPct">Take tax-free lump sum (% of pension pot, max 25%)</label>
+        <input type="number" id="tfcPct" value="0" min="0" max="25" step="1">
+      </div>
+      <p class="hint" id="tfcMaxHint" style="margin:10px 0 0;"></p>
+    </div>
+
+    <div class="card chart-card">
+      <h2><span class="dot" style="background:var(--warn)"></span>Wealth breakdown at retirement <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium, after any tax-free cash)</span></h2>
+      <canvas id="wealthDoughnutChart"></canvas>
+      <p class="chart-note" id="wealthStrapline"></p>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot" style="background:var(--savings)"></span>Tax-free cash summary</h2>
+      <p id="tfcSummary" style="font-size:0.95rem;line-height:1.7;color:var(--text);margin:0;"></p>
     </div>
   </div>
 
   <h2 class="section-title spend">💷 Spending it in retirement</h2>
-  <div class="layout">
-    <!-- CONTROLS -->
-    <div>
+
+  <div class="grid-cards">
       <div class="card">
         <h2><span class="dot" style="background:var(--warn)"></span>Retirement income &amp; State Pension</h2>
-        <div class="row2">
-          <div class="field">
-            <label for="desiredIncome">Desired annual income (£)</label>
-            <input type="number" id="desiredIncome" value="25000" min="0" step="500">
-          </div>
-          <div class="field">
-            <label for="withdrawalRate">Withdrawal rate (%)</label>
-            <input type="number" id="withdrawalRate" value="4" min="1" max="20" step="0.1">
-          </div>
+        <div class="field">
+          <label for="desiredIncome">Desired annual income (£)</label>
+          <input type="number" id="desiredIncome" value="25000" min="0" step="500">
         </div>
-        <p class="hint" style="margin-top:-6px;">The withdrawal rate only feeds the "Required pot" figure below — a quick rule-of-thumb target (income need, minus guaranteed pensions, ÷ this rate). The cash journey chart doesn't use it; it withdraws your actual £ income figures year by year instead.</p>
         <div class="row2">
           <div class="field">
             <label for="reducedAge">Reduce income from age (optional)</label>
-            <input type="number" id="reducedAge" value="80" min="55" max="110" step="1">
+            <input type="number" id="reducedAge" value="80" min="0" max="110" step="1">
           </div>
           <div class="field">
             <label for="reducedIncome">Reduced annual income (£)</label>
             <input type="number" id="reducedIncome" value="20000" min="0" step="500">
           </div>
         </div>
-        <p class="hint" style="margin-top:-6px;">Models spending less later in retirement, e.g. once travel/big purchases slow down. Only kicks in if your pot is projected to last that long — check the note under the cash journey chart.</p>
         <div class="row2">
           <div class="field">
-            <label for="dbPension">DB / other pension income (£/year)</label>
-            <input type="number" id="dbPension" value="0" min="0" step="100">
+            <label for="reducedAge2">Reduce income further from age (optional)</label>
+            <input type="number" id="reducedAge2" value="0" min="0" max="110" step="1">
           </div>
           <div class="field">
-            <label for="dbPensionAge">Starts at age</label>
-            <input type="number" id="dbPensionAge" value="65" min="50" max="80" step="1">
+            <label for="reducedIncome2">Reduced annual income (£)</label>
+            <input type="number" id="reducedIncome2" value="0" min="0" step="500">
           </div>
         </div>
-        <p class="hint" style="margin-top:-6px;">A Defined Benefit / final salary pension, annuity, or other guaranteed income on top of the State Pension. Leave the amount at 0 if this doesn't apply to you.</p>
+        <div class="row2">
+          <div class="field">
+            <label for="reducedAge3">Reduce income further still from age (optional)</label>
+            <input type="number" id="reducedAge3" value="0" min="0" max="110" step="1">
+          </div>
+          <div class="field">
+            <label for="reducedIncome3">Reduced annual income (£)</label>
+            <input type="number" id="reducedIncome3" value="0" min="0" step="500">
+          </div>
+        </div>
+        <p class="hint" style="margin-top:-6px;">Model spending less as retirement progresses (e.g. once travel/big purchases slow down, then again in very old age). Leave an age at 0 to skip that step — each one only kicks in if your pots are projected to last that long.</p>
         <div class="row2">
           <div class="field">
             <label for="statePensionAge">State Pension age</label>
@@ -495,59 +811,152 @@
         </div>
         <p class="hint" style="margin-top:-6px;">Defaults to the full new State Pension for 2026/27 (£241.30/week, needs 35 qualifying NI years). Your actual entitlement may differ — check your <a href="https://www.gov.uk/check-state-pension" target="_blank" rel="noopener">personal forecast on gov.uk</a> and adjust the figure above.</p>
         <div class="field" style="margin-bottom:0;">
-          <label for="planToAge">Plan pot to last until age</label>
+          <label for="planToAge">Plan pots to last until age</label>
           <input type="number" id="planToAge" value="90" min="66" max="110" step="1">
-        </div>
-      </div>
-    </div>
-
-    <!-- RESULTS -->
-    <div>
-      <div class="summary-grid-2">
-        <div class="stat req">
-          <div class="label">Required pot (income gap ÷ withdrawal rate)</div>
-          <div class="value" id="statRequired">£0</div>
-        </div>
-        <div class="stat" id="statGapCard">
-          <div class="label">Surplus / shortfall vs medium pot</div>
-          <div class="value" id="statGap">£0</div>
         </div>
       </div>
 
       <div class="card">
-        <h2><span class="dot" style="background:var(--warn)"></span>Required cash vs projected pot <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(net of State + DB pension)</span></h2>
-        <p id="reqSummary" style="font-size:0.95rem;line-height:1.7;color:var(--text);margin:0;"></p>
+        <h2><span class="dot" style="background:#c792ea"></span>Retirement funding plan</h2>
+        <p class="hint">Add as many actions as you like to any tax year — e.g. spend some of your lump sum on paying off the mortgage <i>and</i> drawdown extra into your ISA in the same year. "Spend" always uses your tax-free lump sum (no growth while it waits). "Top up ISA" can be sourced from your lump sum, savings, or an extra pension drawdown — a drawdown source is taxable, so it's grossed up using the rate below and counted in the higher-rate check under Other income. ISA allowance is £20,000/yr. Money moved into your ISA stays untouched unless the <b>Drawdown allocation</b> table below gives that year's ISA % above 0. Applies to the <b>medium growth scenario</b> only; low/high still follow the drawdown allocation table.</p>
+        <div class="mini-output" id="fundingPlanOutput">No tax-free lump sum taken yet — set one in the "At retirement" section above to unlock this.</div>
+        <div id="fundingList" class="sublist"></div>
+        <div class="funding-add-form">
+          <div class="row3">
+            <div>
+              <label for="fundingYear">Tax year</label>
+              <select id="fundingYear"></select>
+            </div>
+            <div>
+              <label for="fundingKind">Action</label>
+              <select id="fundingKind">
+                <option value="spend">Spend (lump sum)</option>
+                <option value="isa">Top up ISA</option>
+              </select>
+            </div>
+            <div>
+              <label for="fundingAmount">Amount (£)</label>
+              <input type="number" id="fundingAmount" placeholder="e.g. 20000" min="0" step="500">
+            </div>
+          </div>
+          <div class="row3" id="fundingRow2">
+            <div id="fundingSourceWrap">
+              <label for="fundingSource">From</label>
+              <select id="fundingSource">
+                <option value="lump">Lump sum</option>
+                <option value="savings">Savings</option>
+                <option value="drawdown">Drawdown (pension pot)</option>
+              </select>
+            </div>
+            <div style="grid-column:span 2;">
+              <label for="fundingNote">Note (optional)</label>
+              <input type="text" id="fundingNote" placeholder="e.g. Pay off mortgage">
+            </div>
+          </div>
+          <button class="add-btn" id="addFunding" type="button">Add action</button>
+        </div>
       </div>
 
-      <div class="card chart-card chart-card-lg">
-        <h2><span class="dot" style="background:var(--accent-2)"></span>Cash journey at retirement</h2>
-        <canvas id="journeyChart"></canvas>
-        <p class="chart-note" id="journeyNote"></p>
+  </div>
+
+  <div class="grid-cards grid-cards-2">
+      <div class="card">
+        <h2><span class="dot" style="background:var(--savings)"></span>Drawdown allocation</h2>
+        <p class="hint">Set exactly where each year's income shortfall (beyond DB/State pension and any funding-plan spend) comes from — split across your pension pot, savings, ISA and unallocated tax-free lump sum, as a % per year. <b>Savings %</b> only draws on your plain Savings balance from section 2 — if that's £0 (e.g. because your tax-free lump sum is being routed via the funding plan's "move into ISA" instead), Savings % has nothing to draw and the shortfall falls to whichever other bucket you've weighted. If your spare cash lives in your ISA, weight <b>ISA %</b> instead; if it's still sitting as unspent tax-free cash (not yet allocated by the funding plan, or left over once its rows run out), weight <b>Lump sum %</b> to spend it directly — it doesn't grow while unspent, so this is the only way to draw it down without it sitting idle forever. A bucket set to 0% for a year is never touched that year, even if the others run dry. Applies to all three growth scenarios (low/high only have a lump sum to spend if you've taken a tax-free lump sum, since they don't use the funding plan); rows cover every year from retirement to the age you're planning to. Use "Fill all years" to set a default split quickly, then tweak individual years below.</p>
+        <div class="alloc-fill-row">
+          <div class="field" style="margin-bottom:0;">
+            <label>Fill all years — Pot / Savings / ISA / Lump sum (%)</label>
+            <div class="alloc-fill-inputs">
+              <input type="number" id="allocFillPot" min="0" max="100" step="5" value="100">
+              <input type="number" id="allocFillSavings" min="0" max="100" step="5" value="0">
+              <input type="number" id="allocFillIsa" min="0" max="100" step="5" value="0">
+              <input type="number" id="allocFillLump" min="0" max="100" step="5" value="0">
+              <button class="add-btn" id="allocFillBtn" type="button">Apply to all</button>
+            </div>
+          </div>
+        </div>
+        <div class="alloc-table-wrap">
+          <table class="alloc-table" id="allocTable">
+            <thead><tr><th>Age</th><th>Pot %</th><th>Savings %</th><th>ISA %</th><th>Lump sum %</th><th>Total</th></tr></thead>
+            <tbody id="allocTableBody"></tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="card chart-card chart-card-lg">
-        <h2><span class="dot" style="background:var(--med)"></span>Where the money comes from each year <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario)</span></h2>
-        <canvas id="incomeSourceChart"></canvas>
-        <p class="chart-note" id="incomeSourceNote"></p>
+      <div class="card">
+        <h2><span class="dot" style="background:var(--accent)"></span>Other income</h2>
+        <p class="hint">Rental income, part-time work, annuities not covered above, etc. Add as many rows as you need. Leave "until age" blank for income that continues for life. Mark whether each is taxable — this feeds the higher-rate check below as well as the year-by-year charts.</p>
+        <div id="otherList" class="sublist"></div>
+        <div class="add-form add-form-5">
+          <div>
+            <label>Description</label>
+            <input type="text" id="otherName" placeholder="e.g. Rental income">
+          </div>
+          <div>
+            <label>Income (£/yr)</label>
+            <input type="number" id="otherAmount" placeholder="e.g. 6000" min="1" step="50">
+          </div>
+          <div>
+            <label>From age</label>
+            <input type="number" id="otherStartAge" placeholder="65" min="0" max="110" step="1">
+          </div>
+          <div>
+            <label>Until age (optional)</label>
+            <input type="number" id="otherEndAge" placeholder="for life" min="0" max="110" step="1">
+          </div>
+          <button class="add-btn" id="addOther" type="button">Add</button>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="otherTaxable" checked> Taxable income
+        </label>
+
+        <p class="hint" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);">
+          <b style="color:var(--text);">Higher-rate check (medium scenario)</b> — UK higher-rate (40%) tax starts at <b>£50,270</b> for 2026/27. Each year below sums DB pension + State Pension + taxable other income + taxable pension drawdown (ordinary pot spend, plus any drawdown routed into your ISA above, grossed up for tax) — a rough guide only, ignoring the personal allowance and basic-rate band.
+        </p>
+        <div class="field" style="margin-bottom:10px;">
+          <label for="drawdownTaxRate">Assumed tax rate on drawdown-to-ISA transfers (%)</label>
+          <input type="number" id="drawdownTaxRate" value="25" min="0" max="60" step="1">
+        </div>
+        <div id="taxCheckList" class="sublist tax-check-wrap"></div>
       </div>
-    </div>
+  </div>
+
+  <div class="card chart-card">
+    <h2><span class="dot" style="background:var(--savings)"></span>Wealth mix in retirement <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario)</span></h2>
+    <canvas id="wealthMixChart"></canvas>
+    <p class="chart-note" id="wealthMixNote"></p>
+  </div>
+
+  <h2 class="section-title drawdown">📊 Drawdown &amp; cash flow</h2>
+
+  <div class="card chart-card chart-card-lg">
+    <h2><span class="dot" style="background:var(--med)"></span>Where the money comes from each year <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario)</span></h2>
+    <canvas id="incomeSourceChart"></canvas>
+    <p class="chart-note" id="incomeSourceNote"></p>
+  </div>
+
+  <div class="card chart-card chart-card-lg">
+    <h2><span class="dot" style="background:var(--accent-2)"></span>Cash journey at retirement <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(pension + savings/ISA combined)</span></h2>
+    <canvas id="journeyChart"></canvas>
+    <p class="chart-note" id="journeyNote"></p>
   </div>
 
   <div class="save-note">
     <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
-    <span style="display:flex;gap:8px;">
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
       <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
       <button id="exportData" type="button">⬇ Export summary</button>
       <button id="clearSaved" type="button">Reset to defaults</button>
     </span>
   </div>
 
-  <footer>Illustrative only — not financial advice. Assumes constant monthly compounding, a constant annual pay rise, and steady contribution rates between scheduled changes. The UK pension Annual Allowance is currently £60,000/tax year (2026/27) across all your pensions combined; this tool checks your rolling 12-month employee + employer contributions against it as a rough guide only — it does not account for the tapered allowance, Money Purchase Annual Allowance, or carry forward. The cash journey chart assumes withdrawals are taken at the start of each year, each scenario's remaining pot keeps growing at its own growth rate, and State/DB pension income only counts from the ages you set. The "required pot" figure is a rough 4%-rule-style target for the income gap above your State + DB pensions — it's a static reference, not part of the year-by-year cash journey simulation. It all ignores tax, inflation, and State Pension age changes.</footer>
+  <footer>Illustrative only — not financial advice. Assumes constant monthly compounding, a flat salary that only changes when you add a scheduled pay rise, and steady contribution rates between scheduled changes. Dormant DC pots compound from their valuation date at the same low/medium/high rates as your live scheme, with no further contributions. The tax-free lump sum option assumes you take it as a single withdrawal at retirement, capped by the UK Lump Sum Allowance (£268,275 for 2026/27) less any tax-free cash you record as already taken from DB schemes — it does not check scheme-specific commutation limits, doesn't model the Money Purchase Annual Allowance (MPAA) that taking taxable pension income can trigger, and ignores the separate £1,073,100 Lump Sum and Death Benefit Allowance. Savings and ISA are modelled as two separate pots, each growing at the same three rates. In retirement, each year's income shortfall (beyond DB/State pension, other income, and any funding-plan tax-free spend) is split between your pension pot, savings, ISA and unallocated tax-free lump sum according to the % you set for that year in the Drawdown allocation table — a bucket set to 0% for a year is never drawn on that year even if the others run out, in which case the shortfall counts towards that scenario "running out"; this table applies to all three growth scenarios, though low/high only have a lump sum to draw on if you've taken one (they don't use the funding plan). DB pensions and the State Pension are summed and assumed flat in cash terms. The UK pension Annual Allowance is currently £60,000/tax year (2026/27) across all your pensions combined; this tool checks your live scheme's rolling 12-month employee + employer contributions against it as a rough guide only — it does not account for the tapered allowance, MPAA, or carry forward, and doesn't include savings/ISA contributions since those aren't pension contributions. If you've added rows to the retirement funding plan, they apply on top of the drawdown allocation table for the medium scenario only, in year order starting from your retirement date; any tax-free cash left unallocated (or leftover once your rows run out) earns 0% while unspent and is only drawn down via the "Lump sum %" column — it's never auto-swept elsewhere. The cash journey chart assumes withdrawals are taken at the start of each year, remaining balances keep growing at their scenario's rate, and State/DB/other income only counts from the ages you set. Your "reduce income" steps apply in order of age, each overriding the last once reached. It all ignores tax on income drawn (beyond the tax-free lump sum), ISA tax-free status aside, inflation, and State Pension age changes.</footer>
 </div>
 
 <script>
 (function(){
-  const STORAGE_KEY = 'pensionTracker.state.v1';
+  const STORAGE_KEY = 'retirementPlanner.state.v1';
+  const LUMP_SUM_ALLOWANCE = 268275; // UK Lump Sum Allowance, 2026/27
 
   const $ = id => document.getElementById(id);
 
@@ -558,38 +967,41 @@
     }catch(e){ return null; }
   }
 
-  function buildState(){
-    return {
-      startMonth: $('startMonth').value,
-      startYear: $('startYear').value,
-      startingBalance: $('startingBalance').value,
-      dob: $('dob').value,
-      retireAge: $('retireAge').value,
-      salary: $('salary').value,
-      payRise: $('payRise').value,
-      employeePct: $('employeePct').value,
-      employerPct: $('employerPct').value,
-      lowGrowth: $('lowGrowth').value,
-      medGrowth: $('medGrowth').value,
-      highGrowth: $('highGrowth').value,
-      desiredIncome: $('desiredIncome').value,
-      withdrawalRate: $('withdrawalRate').value,
-      reducedAge: $('reducedAge').value,
-      reducedIncome: $('reducedIncome').value,
-      dbPension: $('dbPension').value,
-      dbPensionAge: $('dbPensionAge').value,
-      statePensionAge: $('statePensionAge').value,
-      statePension: $('statePension').value,
-      planToAge: $('planToAge').value,
-      lumpSums: lumpSums,
-      changes: changes
-    };
+  // field ids that map 1:1 onto simple state values (everything else is one of the array
+  // state variables below, e.g. lumpSums/dbPensions/fundingPlan/etc.) — shared by saveNow(),
+  // the "export saved file" backup, and importing a saved file back in.
+  const SIMPLE_FIELD_IDS = [
+    'dob','retireAge','salary','employeePct','employerPct',
+    'lowGrowth','medGrowth','highGrowth',
+    'desiredIncome','reducedAge','reducedIncome','reducedAge2','reducedIncome2','reducedAge3','reducedIncome3',
+    'statePensionAge','statePension','planToAge',
+    'savingsBalance','savingsMonthly','isaBalance','isaMonthly','isaLowGrowth','isaMedGrowth','isaHighGrowth',
+    'tfcPct','drawdownTaxRate'
+  ];
+  const ARRAY_STATE = {
+    pensionHistory: () => pensionHistory,
+    lumpSums: () => lumpSums,
+    changes: () => changes,
+    salaryChanges: () => salaryChanges,
+    dormantDC: () => dormantDC,
+    dbPensions: () => dbPensions,
+    otherIncome: () => otherIncome,
+    fundingPlan: () => fundingPlan,
+    drawdownAlloc: () => drawdownAlloc
+  };
+
+  function buildStateObject(){
+    const state = {};
+    SIMPLE_FIELD_IDS.forEach(id => { state[id] = $(id).value; });
+    Object.keys(ARRAY_STATE).forEach(key => { state[key] = ARRAY_STATE[key](); });
+    state.savingsPreProjected = savingsPreProjected;
+    state.isaPreProjected = isaPreProjected;
+    return state;
   }
 
   function saveNow(){
     try{
-      const state = buildState();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildStateObject()));
       const status = $('saveStatus');
       if(status){
         status.textContent = 'Saved just now in this browser.';
@@ -601,10 +1013,61 @@
     }catch(e){ /* localStorage unavailable */ }
   }
 
+  // Restores every field + array from a saved-file object (same shape as buildStateObject()),
+  // re-renders every list/table, then recomputes and persists it as the new saved state.
+  function restoreState(saved){
+    if(!saved || typeof saved !== 'object') throw new Error('Not a valid saved file.');
+    SIMPLE_FIELD_IDS.forEach(id => {
+      if(saved[id] != null) $(id).value = saved[id];
+    });
+    pensionHistory = Array.isArray(saved.pensionHistory) ? saved.pensionHistory : [];
+    lumpSums = Array.isArray(saved.lumpSums) ? saved.lumpSums : [];
+    changes = Array.isArray(saved.changes) ? saved.changes : [];
+    salaryChanges = Array.isArray(saved.salaryChanges) ? saved.salaryChanges : [];
+    dormantDC = Array.isArray(saved.dormantDC) ? saved.dormantDC : [];
+    dbPensions = Array.isArray(saved.dbPensions) ? saved.dbPensions : [];
+    otherIncome = Array.isArray(saved.otherIncome) ? saved.otherIncome : [];
+    fundingPlan = migrateFundingPlan(Array.isArray(saved.fundingPlan) ? saved.fundingPlan : []);
+    drawdownAlloc = Array.isArray(saved.drawdownAlloc) ? saved.drawdownAlloc : [];
+    savingsPreProjected = !!saved.savingsPreProjected;
+    isaPreProjected = !!saved.isaPreProjected;
+
+    $('dbLumpTaken').value = 0;
+    $('dbLumpMode').value = 'gbp';
+    updateDbLumpPreview();
+    renderLumpList();
+    renderChangeList();
+    renderSalChgList();
+    renderDormantList();
+    renderDbList();
+    renderOtherList();
+    populateFundingYearSelect();
+    renderFundingList();
+    renderAllocTable();
+    renderHistoryTable();
+    setNextHistoryDateDefault();
+    compute();
+  }
+
   // ---------- state ----------
-  let lumpSums = [];  // { month:'YYYY-MM', amount:number }
-  let changes = [];   // { month:'YYYY-MM', pct:number }  -- new combined contribution %
-  let lastResults = {};  // populated at the end of compute(), read by the export button
+  let pensionHistory = []; // { date:'YYYY-MM', value:number, paidIn:number|null }, sorted -> live DC valuation
+                            // history; last entry is the starting point for every projection
+  let lumpSums = [];       // { month:'YYYY-MM', amount:number }               -> live DC
+  let changes = [];        // { month:'YYYY-MM', pct:number }                  -> live DC contribution %
+  let salaryChanges = [];  // { month:'YYYY-MM', amount:number }               -> scheduled salary jump
+  let dormantDC = [];      // { name, month:'YYYY-MM' (valuation), balance }   -> dormant/other DC pots
+  let dbPensions = [];     // { name, amount, startAge }                      -> DB / guaranteed income
+  let otherIncome = [];    // { name, amount, startAge, endAge, taxable }     -> rental etc, endAge optional
+  let fundingPlan = [];    // { yearIndex, kind:'spend'|'isa', amount, source, note }, multiple actions
+                            // per year allowed -> medium-scenario tax-free cash spend / ISA top-up,
+                            // sourced from one of 'lump'/'savings'/'drawdown' (isa actions only)
+  let drawdownAlloc = [];  // { pot, sav, isa } (%), index = year of retirement -> shortfall split, all 3 scenarios
+  let lastResults = {};    // populated at the end of compute(), read by the export button
+  // when true, the Savings/ISA balance field already IS the projected-at-retirement value
+  // (imported from the Savings/ISA tracker), so savingsSeries()/isaSeries() hold it flat instead
+  // of compounding it further — cleared automatically if the balance/monthly fields are hand-edited
+  let savingsPreProjected = false;
+  let isaPreProjected = false;
 
   function downloadJSON(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
@@ -625,7 +1088,7 @@
       `<option value="${String(i+1).padStart(2,'0')}">${name}</option>`
     ).join('');
   }
-  ['startMonth','lumpMonth','chgMonth'].forEach(id => populateMonthSelect($(id)));
+  ['histMonth','lumpMonth','chgMonth','salChgMonth','dormantMonth'].forEach(id => populateMonthSelect($(id)));
 
   function defaultStartMonth(){
     const d = new Date();
@@ -647,44 +1110,99 @@
     return Math.max(0, (Date.now() - dob.getTime()) / msPerYear);
   }
 
-  $('dob').max = new Date().toISOString().slice(0,10);
-
-  // apply a state object (from localStorage or an imported file) to every field
-  function applyState(saved){
-    $('startMonth').value = (saved && saved.startMonth) || nowDefault.month;
-    $('startYear').value = (saved && saved.startYear) || nowDefault.year;
-    $('startingBalance').value = (saved && saved.startingBalance) || 0;
-    $('dob').value = (saved && saved.dob) || defaultDOB();
-    $('retireAge').value = (saved && saved.retireAge) || 65;
-    $('salary').value = (saved && saved.salary) || 35000;
-    $('payRise').value = (saved && saved.payRise) != null ? saved.payRise : 2.5;
-    $('employeePct').value = (saved && saved.employeePct) != null ? saved.employeePct : 5;
-    $('employerPct').value = (saved && saved.employerPct) != null ? saved.employerPct : 3;
-    $('lowGrowth').value = (saved && saved.lowGrowth) != null ? saved.lowGrowth : 3;
-    $('medGrowth').value = (saved && saved.medGrowth) != null ? saved.medGrowth : 5;
-    $('highGrowth').value = (saved && saved.highGrowth) != null ? saved.highGrowth : 7;
-    $('desiredIncome').value = (saved && saved.desiredIncome) != null ? saved.desiredIncome : 25000;
-    $('withdrawalRate').value = (saved && saved.withdrawalRate) != null ? saved.withdrawalRate : 4;
-    $('reducedAge').value = (saved && saved.reducedAge) != null ? saved.reducedAge : 80;
-    $('reducedIncome').value = (saved && saved.reducedIncome) != null ? saved.reducedIncome : 20000;
-    $('dbPension').value = (saved && saved.dbPension) != null ? saved.dbPension : 0;
-    $('dbPensionAge').value = (saved && saved.dbPensionAge) != null ? saved.dbPensionAge : 65;
-    $('statePensionAge').value = (saved && saved.statePensionAge) != null ? saved.statePensionAge : 67;
-    $('statePension').value = (saved && saved.statePension) != null ? saved.statePension : 12548;
-    $('planToAge').value = (saved && saved.planToAge) != null ? saved.planToAge : 90;
-    lumpSums = (saved && Array.isArray(saved.lumpSums)) ? saved.lumpSums : [];
-    changes = (saved && Array.isArray(saved.changes)) ? saved.changes : [];
-    renderLumpList();
-    renderChangeList();
+  // The calendar date you turn "retireAge", based on your date of birth.
+  function retirementDate(){
+    const dobStr = $('dob').value;
+    if(!dobStr) return null;
+    const dob = new Date(dobStr + 'T00:00:00');
+    if(isNaN(dob.getTime())) return null;
+    const retireAge = Math.round(parseFloat($('retireAge').value) || 65);
+    const d = new Date(dob);
+    d.setFullYear(d.getFullYear() + retireAge);
+    return d;
   }
 
+  // UK tax years run 6 April to 5 April — returns the start year of the tax year a date falls in
+  // (e.g. 1 Feb 2031 -> 2030, meaning tax year "2030/31").
+  function ukTaxYearStart(d){
+    const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+    const afterCutoff = (m > 4) || (m === 4 && day >= 6);
+    return afterCutoff ? y : y - 1;
+  }
+
+  function taxYearLabel(startYear){
+    return startYear + '/' + String((startYear + 1) % 100).padStart(2, '0');
+  }
+
+  // Tax year label for the Nth year of the retirement funding plan (idx 0 = the tax year you
+  // retire in), based on your date of birth and retirement age. Falls back to "Year N" if dob
+  // isn't set yet.
+  function fundingYearLabel(idx){
+    const rd = retirementDate();
+    if(!rd) return `Year ${idx + 1}`;
+    return taxYearLabel(ukTaxYearStart(rd) + idx);
+  }
+
+  $('dob').max = new Date().toISOString().slice(0,10);
+
   const saved = loadSaved();
-  applyState(saved);
+  $('dob').value = (saved && saved.dob) || defaultDOB();
+  $('retireAge').value = (saved && saved.retireAge) || 65;
+  $('salary').value = (saved && saved.salary) || 35000;
+  $('employeePct').value = (saved && saved.employeePct) != null ? saved.employeePct : 5;
+  $('employerPct').value = (saved && saved.employerPct) != null ? saved.employerPct : 3;
+  $('lowGrowth').value = (saved && saved.lowGrowth) != null ? saved.lowGrowth : 3;
+  $('medGrowth').value = (saved && saved.medGrowth) != null ? saved.medGrowth : 5;
+  $('highGrowth').value = (saved && saved.highGrowth) != null ? saved.highGrowth : 7;
+  $('desiredIncome').value = (saved && saved.desiredIncome) != null ? saved.desiredIncome : 25000;
+  $('reducedAge').value = (saved && saved.reducedAge) != null ? saved.reducedAge : 80;
+  $('reducedIncome').value = (saved && saved.reducedIncome) != null ? saved.reducedIncome : 20000;
+  $('reducedAge2').value = (saved && saved.reducedAge2) != null ? saved.reducedAge2 : 0;
+  $('reducedIncome2').value = (saved && saved.reducedIncome2) != null ? saved.reducedIncome2 : 0;
+  $('reducedAge3').value = (saved && saved.reducedAge3) != null ? saved.reducedAge3 : 0;
+  $('reducedIncome3').value = (saved && saved.reducedIncome3) != null ? saved.reducedIncome3 : 0;
+  $('statePensionAge').value = (saved && saved.statePensionAge) != null ? saved.statePensionAge : 67;
+  $('statePension').value = (saved && saved.statePension) != null ? saved.statePension : 12548;
+  $('planToAge').value = (saved && saved.planToAge) != null ? saved.planToAge : 90;
+  $('savingsBalance').value = (saved && saved.savingsBalance) != null ? saved.savingsBalance : 0;
+  $('savingsMonthly').value = (saved && saved.savingsMonthly) != null ? saved.savingsMonthly : 0;
+  $('isaBalance').value = (saved && saved.isaBalance) != null ? saved.isaBalance : 0;
+  $('isaMonthly').value = (saved && saved.isaMonthly) != null ? saved.isaMonthly : 0;
+  $('isaLowGrowth').value = (saved && saved.isaLowGrowth) != null ? saved.isaLowGrowth : 3;
+  $('isaMedGrowth').value = (saved && saved.isaMedGrowth) != null ? saved.isaMedGrowth : 5;
+  $('isaHighGrowth').value = (saved && saved.isaHighGrowth) != null ? saved.isaHighGrowth : 7;
+  $('tfcPct').value = (saved && saved.tfcPct) != null ? saved.tfcPct : 0;
+  $('drawdownTaxRate').value = (saved && saved.drawdownTaxRate) != null ? saved.drawdownTaxRate : 25;
+  savingsPreProjected = !!(saved && saved.savingsPreProjected);
+  isaPreProjected = !!(saved && saved.isaPreProjected);
+  lumpSums = (saved && Array.isArray(saved.lumpSums)) ? saved.lumpSums : [];
+  changes = (saved && Array.isArray(saved.changes)) ? saved.changes : [];
+  salaryChanges = (saved && Array.isArray(saved.salaryChanges)) ? saved.salaryChanges : [];
+  dormantDC = (saved && Array.isArray(saved.dormantDC)) ? saved.dormantDC : [];
+  dbPensions = (saved && Array.isArray(saved.dbPensions)) ? saved.dbPensions : [];
+  otherIncome = (saved && Array.isArray(saved.otherIncome)) ? saved.otherIncome : [];
+  fundingPlan = migrateFundingPlan((saved && Array.isArray(saved.fundingPlan)) ? saved.fundingPlan : []);
+  drawdownAlloc = (saved && Array.isArray(saved.drawdownAlloc)) ? saved.drawdownAlloc : [];
+  if(saved && Array.isArray(saved.pensionHistory) && saved.pensionHistory.length){
+    pensionHistory = saved.pensionHistory;
+  } else if(saved && saved.startMonth && saved.startYear){
+    // migrate from the old single starting-point fields (pre-history-table versions)
+    pensionHistory = [{date: saved.startYear + '-' + saved.startMonth, value: parseFloat(saved.startingBalance) || 0, paidIn: null}];
+  } else {
+    // no seeded placeholder row here on purpose — a "today" row would sort after every real
+    // (past-dated) valuation the person adds, wrongly becoming the "latest" entry. Start empty;
+    // currentStartingPoint() already falls back to £0/today until a first real row is added.
+    pensionHistory = [];
+  }
 
   $('lumpMonth').value = nowDefault.month;
   $('lumpYear').value = nowDefault.year;
   $('chgMonth').value = nowDefault.month;
   $('chgYear').value = nowDefault.year;
+  $('salChgMonth').value = nowDefault.month;
+  $('salChgYear').value = nowDefault.year;
+  $('dormantMonth').value = nowDefault.month;
+  $('dormantYear').value = nowDefault.year;
 
   function readYM(monthSelId, yearInputId){
     const month = $(monthSelId).value;
@@ -704,12 +1222,99 @@
     return new Date(y, m-1, 1).toLocaleDateString('en-GB', {month:'short', year:'numeric'});
   }
 
+  function fmtMonthShort(ym){
+    const [y,m] = ym.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString('en-GB', {month:'short', year:'2-digit'}).replace(' ', '-');
+  }
+
   function gbp(n){
     return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits:0});
   }
 
+  // the live DC scheme's "now" for every projection is the most recent row of the valuation
+  // history table — not a separate standalone field — so balance + growth are always in sync
+  // with whatever the person has actually logged.
+  function currentStartingPoint(){
+    if(pensionHistory.length === 0){
+      return {startYM: nowDefault.year + '-' + nowDefault.month, startingBalance: 0};
+    }
+    const last = pensionHistory[pensionHistory.length - 1];
+    return {startYM: last.date, startingBalance: parseFloat(last.value) || 0};
+  }
+
+  // Reconstructs "true" contributions vs growth across the whole logged history: the opening
+  // (first-row) balance is treated as principal since we don't know its own composition, then
+  // each subsequent row's "paid in" is added to the contributed total, with whatever's left
+  // over (the gap to that row's actual value) counted as growth. This is what lets the charts
+  // and totals below distinguish money you put in from money the investments made, across the
+  // *whole* history — not just from today onward.
+  function historicalSummary(){
+    if(pensionHistory.length === 0) return {contrib: 0, growth: 0, points: []};
+    let cumContrib = parseFloat(pensionHistory[0].value) || 0;
+    const points = [{date: pensionHistory[0].date, value: parseFloat(pensionHistory[0].value) || 0, cumContrib, paidIn: null, growth: null}];
+    for(let i = 1; i < pensionHistory.length; i++){
+      const paidIn = parseFloat(pensionHistory[i].paidIn) || 0;
+      const value = parseFloat(pensionHistory[i].value) || 0;
+      const prevValue = points[i-1].value;
+      cumContrib += paidIn;
+      points.push({date: pensionHistory[i].date, value, cumContrib, paidIn, growth: value - prevValue - paidIn});
+    }
+    const lastValue = points[points.length - 1].value;
+    return {contrib: cumContrib, growth: lastValue - cumContrib, points};
+  }
+
+  // Simple Dietz method: backs out the investment return for a period given the start value,
+  // end value, and net contribution during the period (assumed to land evenly through it).
+  function impliedReturn(prevValue, paidIn, value){
+    const p = parseFloat(prevValue) || 0;
+    const c = parseFloat(paidIn) || 0;
+    const v = parseFloat(value) || 0;
+    const denom = p + c/2;
+    if(denom <= 0) return null;
+    return ((v - p - c) / denom) * 100;
+  }
+
+  // Annualised implied growth across the full span of logged history (first valuation to last),
+  // chain-linking each period's Simple Dietz return rather than just looking at the latest period.
+  // This only ever uses whole logged periods — e.g. if you've logged April every year from 2018 to
+  // 2026, it uses the full Apr'18→Apr'26 span; it won't move again until you log a full new year
+  // (e.g. Apr'27), so a partial/part-way-through-the-year gap never skews the rate.
+  function overallImpliedGrowth(){
+    if(pensionHistory.length < 2) return null;
+    const points = historicalSummary().points;
+    let growthFactor = 1;
+    for(let i = 1; i < points.length; i++){
+      const r = impliedReturn(points[i-1].value, points[i].paidIn, points[i].value);
+      if(r == null) return null;
+      growthFactor *= (1 + r / 100);
+    }
+    const totalMonths = monthOffset(points[0].date, points[points.length - 1].date);
+    const years = totalMonths / 12;
+    if(years <= 0) return null;
+    return (Math.pow(growthFactor, 1 / years) - 1) * 100;
+  }
+
+  function updateHistoryGrowthNote(){
+    const noteEl = $('historyGrowthNote');
+    const btnEl = $('applyHighGrowth');
+    if(!noteEl || !btnEl) return;
+    const r = overallImpliedGrowth();
+    if(r == null){
+      noteEl.textContent = 'Add at least two valuations (a full year apart) to see your implied annual growth rate.';
+      btnEl.style.display = 'none';
+      return;
+    }
+    const first = pensionHistory[0];
+    const last = pensionHistory[pensionHistory.length - 1];
+    noteEl.innerHTML = `Implied annual growth over your logged history (<b>${fmtMonthShort(first.date)}</b> to <b>${fmtMonthShort(last.date)}</b>): ` +
+      `<b style="color:${r >= 0 ? 'var(--high)' : 'var(--danger)'}">${r > 0 ? '+' : ''}${r.toFixed(1)}%</b> — ` +
+      `you can carry this into the High growth scenario below.`;
+    btnEl.style.display = '';
+    btnEl.dataset.rate = r.toFixed(1);
+  }
+
   // ---------- chart instances ----------
-  let growthChart, barChart, doughnutChart, journeyChart, incomeSourceChart;
+  let growthChart, barChart, doughnutChart, journeyChart, incomeSourceChart, wealthDoughnutChart, wealthMixChart;
   const gridColor = 'rgba(255,255,255,0.06)';
   Chart.defaults.color = '#9aa3c7';
   Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
@@ -722,7 +1327,8 @@
         {label:'High growth', data:[], borderColor:'#2fd6a7', backgroundColor:'rgba(47,214,167,0.10)', fill:false, tension:0.3, pointRadius:0, borderWidth:2.5},
         {label:'Medium growth', data:[], borderColor:'#f2b84b', backgroundColor:'rgba(242,184,75,0.12)', fill:'+1', tension:0.3, pointRadius:0, borderWidth:2.5},
         {label:'Low growth', data:[], borderColor:'#7c8cff', backgroundColor:'rgba(124,140,255,0.12)', fill:'+1', tension:0.3, pointRadius:0, borderWidth:2.5},
-        {label:'Total contributed', data:[], borderColor:'#9aa3c7', backgroundColor:'transparent', fill:false, tension:0.15, pointRadius:0, borderWidth:2, borderDash:[5,4]}
+        {label:'Total contributed', data:[], borderColor:'#9aa3c7', backgroundColor:'transparent', fill:false, tension:0.15, pointRadius:0, borderWidth:2, borderDash:[5,4]},
+        {label:'Actual value (history)', data:[], borderColor:'#c792ea', backgroundColor:'rgba(199,146,234,0.12)', fill:false, tension:0.15, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#c792ea', borderWidth:2.5, spanGaps:false}
       ]},
       options:{
         responsive:true,
@@ -783,9 +1389,13 @@
       data:{
         labels:[],
         datasets:[
-          {type:'bar', label:'DB pension', data:[], backgroundColor:'#7c8cff', stack:'income'},
+          {type:'bar', label:'DB pension(s)', data:[], backgroundColor:'#7c8cff', stack:'income'},
           {type:'bar', label:'State pension', data:[], backgroundColor:'#2fd6a7', stack:'income'},
-          {type:'bar', label:'DC pot spend', data:[], backgroundColor:'#f2b84b', stack:'income'},
+          {type:'bar', label:'Other income', data:[], backgroundColor:'#4fc3f7', stack:'income'},
+          {type:'bar', label:'Tax-free cash spend', data:[], backgroundColor:'#c792ea', stack:'income'},
+          {type:'bar', label:'Pension pot spend', data:[], backgroundColor:'#f2b84b', stack:'income'},
+          {type:'bar', label:'Savings spend', data:[], backgroundColor:'#ff8fa3', stack:'income'},
+          {type:'bar', label:'ISA spend', data:[], backgroundColor:'#00c2a8', stack:'income'},
           {type:'line', label:'Required income', data:[], borderColor:'#eaeefb', backgroundColor:'transparent', borderWidth:2, borderDash:[6,4], pointRadius:0, stepped:true, fill:false}
         ]
       },
@@ -832,6 +1442,50 @@
         }
       }
     });
+
+    const wmctx = $('wealthMixChart').getContext('2d');
+    wealthMixChart = new Chart(wmctx, {
+      type:'line',
+      data:{labels:[], datasets:[
+        {label:'Pension pot', data:[], borderColor:'#f2b84b', backgroundColor:'rgba(242,184,75,0.12)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5},
+        {label:'Savings', data:[], borderColor:'#ff8fa3', backgroundColor:'rgba(255,143,163,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5},
+        {label:'ISA', data:[], borderColor:'#00c2a8', backgroundColor:'rgba(0,194,168,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5}
+      ]},
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{
+            title:ctx => 'Age ' + ctx[0].label,
+            label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)
+          }}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, title:{display:true, text:'Age', color:'#9aa3c7'}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}, beginAtZero:true}
+        }
+      }
+    });
+
+    const wdctx = $('wealthDoughnutChart').getContext('2d');
+    wealthDoughnutChart = new Chart(wdctx, {
+      type:'doughnut',
+      data:{labels:['Pension pot','Savings/ISA','Tax-free lump sum'], datasets:[{
+        data:[0,0,0],
+        backgroundColor:['#f2b84b','#ff8fa3','#c792ea'],
+        borderColor:'#161d2e',
+        borderWidth:3
+      }]},
+      options:{
+        responsive:true,
+        plugins:{
+          legend:{position:'bottom', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{label:ctx => ctx.label + ': ' + gbp(ctx.parsed)}}
+        },
+        cutout:'65%'
+      }
+    });
   }
 
   // ---------- render sublists ----------
@@ -841,7 +1495,7 @@
       el.innerHTML = '<div class="empty-note">No lump sums added yet.</div>';
       return;
     }
-    const startYM = readYM('startMonth','startYear') || (nowDefault.year + '-' + nowDefault.month);
+    const startYM = currentStartingPoint().startYM;
     const currentAge = ageFromDOB($('dob').value);
     el.innerHTML = lumpSums
       .slice()
@@ -862,7 +1516,7 @@
       el.innerHTML = '<div class="empty-note">No future contribution changes scheduled.</div>';
       return;
     }
-    const startYM = readYM('startMonth','startYear') || (nowDefault.year + '-' + nowDefault.month);
+    const startYM = currentStartingPoint().startYM;
     const currentAge = ageFromDOB($('dob').value);
     el.innerHTML = changes
       .slice()
@@ -877,17 +1531,349 @@
       }).join('');
   }
 
+  function renderSalChgList(){
+    const el = $('salChgList');
+    if(salaryChanges.length === 0){
+      el.innerHTML = '<div class="empty-note">No scheduled pay rises added yet.</div>';
+      return;
+    }
+    const startYM = currentStartingPoint().startYM;
+    const currentAge = ageFromDOB($('dob').value);
+    const base = parseFloat($('salary').value) || 0;
+    let runningSalary = base;
+    el.innerHTML = salaryChanges
+      .map((s, idx) => ({...s, idx}))
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map((s) => {
+        runningSalary = runningSalary * (1 + (parseFloat(s.pct)||0)/100);
+        const ageAt = (currentAge + monthOffset(startYM, s.month)/12).toFixed(1);
+        return `<div class="sublist-item">
+          <div class="meta"><b>+${s.pct}% &rarr; ${gbp(runningSalary)}</b><span>from ${fmtMonth(s.month)} · age ${ageAt}</span></div>
+          <button class="remove-btn" data-type="salchg" data-idx="${s.idx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  function renderHistoryTable(){
+    const el = $('historyTableBody');
+    if(pensionHistory.length === 0){
+      el.innerHTML = '<tr><td colspan="5" class="empty-note">Add your first valuation below to get started.</td></tr>';
+      updateHistoryGrowthNote();
+      return;
+    }
+    el.innerHTML = pensionHistory.map((h, idx) => {
+      const prev = idx > 0 ? pensionHistory[idx-1] : null;
+      let returnCell = '—', returnClass = '';
+      if(prev){
+        const r = impliedReturn(prev.value, h.paidIn, h.value);
+        if(r != null){
+          returnClass = r > 0 ? 'pos' : (r < 0 ? 'neg' : '');
+          returnCell = (r > 0 ? '+' : '') + r.toFixed(1) + '%';
+        }
+      }
+      const paidInCell = idx === 0
+        ? '—'
+        : `<input type="number" class="hist-input" data-idx="${idx}" data-field="paidIn" min="0" step="50" value="${h.paidIn||0}">`;
+      return `<tr>
+        <td>${fmtMonthShort(h.date)}</td>
+        <td><input type="number" class="hist-input" data-idx="${idx}" data-field="value" min="0" step="100" value="${h.value}"></td>
+        <td>${paidInCell}</td>
+        <td class="hist-return ${returnClass}">${returnCell}</td>
+        <td><button class="remove-btn" data-type="hist" data-idx="${idx}">✕</button></td>
+      </tr>`;
+    }).join('');
+    updateHistoryGrowthNote();
+  }
+
+  // updates just one row's computed "implied return" cell in place, without rebuilding the
+  // table — keeps focus in whichever input the person is currently typing into
+  function updateHistoryReturnCell(idx){
+    if(idx <= 0 || !pensionHistory[idx] || !pensionHistory[idx-1]) return;
+    const row = document.querySelectorAll('#historyTableBody tr')[idx];
+    if(!row) return;
+    const cell = row.querySelector('.hist-return');
+    if(!cell) return;
+    const prev = pensionHistory[idx-1];
+    const cur = pensionHistory[idx];
+    const r = impliedReturn(prev.value, cur.paidIn, cur.value);
+    if(r == null){ cell.textContent = '—'; cell.className = 'hist-return'; return; }
+    cell.textContent = (r > 0 ? '+' : '') + r.toFixed(1) + '%';
+    cell.className = 'hist-return ' + (r > 0 ? 'pos' : (r < 0 ? 'neg' : ''));
+  }
+
+  // defaults the "add a year" date fields to 12 months after the latest history entry, since
+  // valuations are usually logged annually at the same point in the financial year
+  function setNextHistoryDateDefault(){
+    if(pensionHistory.length === 0){
+      $('histMonth').value = nowDefault.month;
+      $('histYear').value = nowDefault.year;
+      return;
+    }
+    const last = pensionHistory[pensionHistory.length - 1];
+    const [y, m] = last.date.split('-').map(Number);
+    $('histMonth').value = String(m).padStart(2, '0');
+    $('histYear').value = y + 1;
+  }
+
+  function renderDormantList(){
+    const el = $('dormantList');
+    if(dormantDC.length === 0){
+      el.innerHTML = '<div class="empty-note">No dormant pensions added yet.</div>';
+      return;
+    }
+    el.innerHTML = dormantDC
+      .slice()
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map((d) => {
+        const realIdx = dormantDC.indexOf(d);
+        return `<div class="sublist-item">
+          <div class="meta"><b>${d.name || 'Dormant pot'}</b><span>${gbp(d.balance)} as of ${fmtMonth(d.month)}</span></div>
+          <button class="remove-btn" data-type="dormant" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  function renderDbList(){
+    const el = $('dbList');
+    if(dbPensions.length === 0){
+      el.innerHTML = '<div class="empty-note">No DB pensions added yet.</div>';
+      return;
+    }
+    el.innerHTML = dbPensions
+      .slice()
+      .sort((a,b) => a.startAge - b.startAge)
+      .map((d) => {
+        const realIdx = dbPensions.indexOf(d);
+        const lumpNote = d.lumpTaken > 0
+          ? (d.lumpMode === 'pct'
+              ? ` · ${d.lumpRaw}% of allowance (${gbp(d.lumpTaken)}) tax-free lump`
+              : ` · ${gbp(d.lumpTaken)} tax-free lump`)
+          : '';
+        return `<div class="sublist-item">
+          <div class="meta"><b>${d.name || 'DB pension'}</b><span>${gbp(d.amount)}/yr from age ${d.startAge}${lumpNote}</span></div>
+          <button class="remove-btn" data-type="db" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  function renderOtherList(){
+    const el = $('otherList');
+    if(otherIncome.length === 0){
+      el.innerHTML = '<div class="empty-note">No other income added yet.</div>';
+      return;
+    }
+    el.innerHTML = otherIncome
+      .slice()
+      .sort((a,b) => a.startAge - b.startAge)
+      .map((o) => {
+        const realIdx = otherIncome.indexOf(o);
+        const span = o.endAge ? `${gbp(o.amount)}/yr, age ${o.startAge}–${o.endAge}` : `${gbp(o.amount)}/yr from age ${o.startAge}`;
+        const taxTag = o.taxable === false ? ' · tax-free' : ' · taxable';
+        return `<div class="sublist-item">
+          <div class="meta"><b>${o.name || 'Other income'}</b><span>${span}${taxTag}</span></div>
+          <button class="remove-btn" data-type="other" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  const FUNDING_SOURCE_LABEL = {lump: 'lump sum', savings: 'savings', drawdown: 'drawdown (taxable)'};
+
+  // Converts any pre-multi-action saved data (one row per year, shape {spend, isa, source})
+  // into the current flat-list-of-actions shape ({yearIndex, kind, amount, source, note}).
+  function migrateFundingPlan(plan){
+    if(!Array.isArray(plan)) return [];
+    const isOldShape = plan.some(f => f && (f.spend !== undefined || f.isa !== undefined) && f.kind === undefined);
+    if(!isOldShape) return plan;
+    const migrated = [];
+    plan.forEach((f, idx) => {
+      if(f.spend > 0) migrated.push({yearIndex: idx, kind: 'spend', amount: f.spend, source: 'lump', note: ''});
+      if(f.isa > 0) migrated.push({yearIndex: idx, kind: 'isa', amount: f.isa, source: f.source || 'lump', note: ''});
+    });
+    return migrated;
+  }
+
+  // Keeps the "Tax year" add-form select in sync with the drawdown horizon (retireAge -> planToAge).
+  function populateFundingYearSelect(){
+    const sel = $('fundingYear');
+    if(!sel) return;
+    const {n} = resizeAllocTable();
+    const prevValue = sel.value;
+    sel.innerHTML = Array.from({length: n}, (_, idx) => `<option value="${idx}">${fundingYearLabel(idx)}</option>`).join('');
+    if(prevValue !== '' && Number(prevValue) < n) sel.value = prevValue;
+  }
+
+  function renderFundingList(){
+    const el = $('fundingList');
+    if(fundingPlan.length === 0){
+      el.innerHTML = '<div class="empty-note">No funding plan actions added yet.</div>';
+      return;
+    }
+    const retireAge = parseFloat($('retireAge').value) || 65;
+    const sorted = fundingPlan.map((f, realIdx) => ({f, realIdx})).sort((a,b) => a.f.yearIndex - b.f.yearIndex);
+    el.innerHTML = sorted.map(({f, realIdx}) => {
+      const age = Math.round(retireAge) + f.yearIndex;
+      const noteText = f.note ? ` — ${f.note}` : '';
+      const desc = f.kind === 'spend'
+        ? `spend ${gbp(f.amount)} (lump sum)${noteText}`
+        : `+${gbp(f.amount)} to ISA (from ${FUNDING_SOURCE_LABEL[f.source] || 'lump sum'})${noteText}`;
+      return `<div class="sublist-item">
+        <div class="meta"><b>${fundingYearLabel(f.yearIndex)}</b><span>age ${age} · ${desc}</span></div>
+        <button class="remove-btn" data-type="funding" data-idx="${realIdx}">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  // UK higher-rate (40%) threshold, 2026/27 — unchanged from 2025/26, frozen through several
+  // more tax years. This is a rough guide only: it sums taxable income sources directly against
+  // the threshold and doesn't apply the personal allowance or basic-rate band itself.
+  const HIGHER_RATE_THRESHOLD = 50270;
+
+  function renderTaxCheck(journey, startAge){
+    const el = $('taxCheckList');
+    if(!el) return;
+    if(!journey || !journey.yearAges || journey.yearAges.length === 0){
+      el.innerHTML = '<div class="empty-note">Set a retirement age and "plan to age" above to see this.</div>';
+      return;
+    }
+    el.innerHTML = journey.yearAges.map((age, idx) => {
+      const taxable = Math.round(
+        (journey.dbIncomes[idx] || 0) +
+        (journey.spIncomes[idx] || 0) +
+        (journey.taxableOtherIncomes[idx] || 0) +
+        (journey.potSpends[idx] || 0) +
+        (journey.drawdownIsaTaxable[idx] || 0)
+      );
+      const over = taxable > HIGHER_RATE_THRESHOLD;
+      const yearIndex = age - startAge;
+      return `<div class="sublist-item${over ? ' warn' : ''}">
+        <div class="meta"><b>${fundingYearLabel(yearIndex)}</b><span>age ${age} · taxable income ${gbp(taxable)}${over ? ' — over the £50,270 higher-rate threshold' : ''}</span></div>
+      </div>`;
+    }).join('');
+  }
+
+  // keep drawdownAlloc sized to match the number of retirement years (retireAge -> planToAge),
+  // preserving existing rows by index and defaulting new ones to "spend the pot first" (100%
+  // pot / 0% savings / 0% ISA) so savings/ISA are never touched unless the user opts in.
+  function resizeAllocTable(){
+    const retireAge = parseFloat($('retireAge').value) || 65;
+    const planToAge = parseFloat($('planToAge').value) || 90;
+    const startAge = Math.max(Math.round(retireAge), 1);
+    const endAge = Math.max(startAge, Math.round(planToAge));
+    const n = Math.max(0, endAge - startAge);
+    while(drawdownAlloc.length < n) drawdownAlloc.push({pot: 100, sav: 0, isa: 0, lump: 0});
+    drawdownAlloc.length = n;
+    drawdownAlloc.forEach(row => { if(row.lump == null) row.lump = 0; }); // upgrade rows saved before the lump-sum column existed
+    return {startAge, endAge, n};
+  }
+
+  function renderAllocTable(){
+    const {startAge, n} = resizeAllocTable();
+    const el = $('allocTableBody');
+    if(n === 0){
+      el.innerHTML = '<tr><td colspan="6" class="empty-note">Set a retirement age and "plan to age" above to generate years.</td></tr>';
+      return;
+    }
+    el.innerHTML = drawdownAlloc.map((row, idx) => {
+      const age = startAge + idx;
+      const sum = (row.pot||0) + (row.sav||0) + (row.isa||0) + (row.lump||0);
+      const warn = Math.abs(sum - 100) > 0.5;
+      return `<tr${warn ? ' class="alloc-warn"' : ''}>
+        <td>${age}</td>
+        <td><input type="number" class="alloc-input" data-idx="${idx}" data-field="pot" min="0" max="100" step="5" value="${row.pot}"></td>
+        <td><input type="number" class="alloc-input" data-idx="${idx}" data-field="sav" min="0" max="100" step="5" value="${row.sav}"></td>
+        <td><input type="number" class="alloc-input" data-idx="${idx}" data-field="isa" min="0" max="100" step="5" value="${row.isa}"></td>
+        <td><input type="number" class="alloc-input" data-idx="${idx}" data-field="lump" min="0" max="100" step="5" value="${row.lump}"></td>
+        <td class="alloc-sum">${Math.round(sum)}%</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.body.addEventListener('input', e => {
+    const inp = e.target.closest('.alloc-input');
+    if(!inp) return;
+    const idx = Number(inp.dataset.idx);
+    const field = inp.dataset.field;
+    if(!drawdownAlloc[idx]) return;
+    const val = Math.max(0, Math.min(100, parseFloat(inp.value) || 0));
+    drawdownAlloc[idx][field] = val;
+    const row = inp.closest('tr');
+    if(row){
+      const r = drawdownAlloc[idx];
+      const sum = (r.pot||0) + (r.sav||0) + (r.isa||0) + (r.lump||0);
+      const sumCell = row.querySelector('.alloc-sum');
+      if(sumCell) sumCell.textContent = Math.round(sum) + '%';
+      row.classList.toggle('alloc-warn', Math.abs(sum - 100) > 0.5);
+    }
+    compute();
+  });
+
+  document.body.addEventListener('input', e => {
+    const inp = e.target.closest('.hist-input');
+    if(!inp) return;
+    const idx = Number(inp.dataset.idx);
+    const field = inp.dataset.field;
+    if(!pensionHistory[idx]) return;
+    const val = Math.max(0, parseFloat(inp.value) || 0);
+    pensionHistory[idx][field] = val;
+    updateHistoryReturnCell(idx);
+    updateHistoryReturnCell(idx + 1);
+    if(idx >= pensionHistory.length - 2) updateHistoryGrowthNote();
+    compute();
+  });
+
   document.body.addEventListener('click', e => {
     const btn = e.target.closest('.remove-btn');
     if(!btn) return;
     const idx = Number(btn.dataset.idx);
-    if(btn.dataset.type === 'lump'){
+    const type = btn.dataset.type;
+    if(type === 'lump'){
       lumpSums.splice(idx,1);
       renderLumpList();
-    } else {
+    } else if(type === 'chg'){
       changes.splice(idx,1);
       renderChangeList();
+    } else if(type === 'salchg'){
+      salaryChanges.splice(idx,1);
+      renderSalChgList();
+    } else if(type === 'dormant'){
+      dormantDC.splice(idx,1);
+      renderDormantList();
+    } else if(type === 'db'){
+      dbPensions.splice(idx,1);
+      renderDbList();
+    } else if(type === 'other'){
+      otherIncome.splice(idx,1);
+      renderOtherList();
+    } else if(type === 'funding'){
+      fundingPlan.splice(idx,1);
+      renderFundingList();
+    } else if(type === 'hist'){
+      pensionHistory.splice(idx,1);
+      renderHistoryTable();
+      setNextHistoryDateDefault();
     }
+    compute();
+  });
+
+  $('addHistory').addEventListener('click', () => {
+    const month = readYM('histMonth','histYear');
+    const value = parseFloat($('histValue').value);
+    if(!month || isNaN(value) || value < 0){ return; }
+    const paidInRaw = $('histPaidIn').value;
+    const paidIn = paidInRaw === '' ? 0 : (parseFloat(paidInRaw) || 0);
+    pensionHistory.push({date: month, value, paidIn});
+    pensionHistory.sort((a,b) => a.date.localeCompare(b.date));
+    $('histValue').value = '';
+    $('histPaidIn').value = '';
+    renderHistoryTable();
+    setNextHistoryDateDefault();
+    compute();
+  });
+
+  $('applyHighGrowth').addEventListener('click', () => {
+    const rate = $('applyHighGrowth').dataset.rate;
+    if(rate == null) return;
+    $('highGrowth').value = rate;
     compute();
   });
 
@@ -911,46 +1897,197 @@
     compute();
   });
 
-  $('clearSaved').addEventListener('click', () => {
-    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
-    applyState(null);
+  $('addSalChg').addEventListener('click', () => {
+    const month = readYM('salChgMonth','salChgYear');
+    const pct = parseFloat($('salChgPct').value);
+    if(!month || !pct || pct <= 0){ return; }
+    salaryChanges.push({month, pct});
+    $('salChgPct').value = '';
+    renderSalChgList();
     compute();
   });
 
-  $('importData').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try{
-        const parsed = JSON.parse(reader.result);
-        if(parsed.tracker !== 'pension'){
-          alert("That doesn't look like a summary file from this Pension tracker.");
-          return;
-        }
-        if(!parsed.state){
-          alert('This file was exported before cross-device import was added — please re-export it from the other device first.');
-          return;
-        }
-        applyState(parsed.state);
-        compute();
-      }catch(err){
-        alert('Could not read that file — make sure it\'s the JSON exported from this tracker.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+  $('addDormant').addEventListener('click', () => {
+    const month = readYM('dormantMonth','dormantYear');
+    const balance = parseFloat($('dormantBalance').value);
+    const name = $('dormantName').value.trim();
+    if(!month || !balance || balance <= 0){ return; }
+    dormantDC.push({name, month, balance});
+    $('dormantBalance').value = '';
+    $('dormantName').value = '';
+    renderDormantList();
+    compute();
+  });
+
+  // Resolve the DB lump-sum add-form's current value (£ or % of the Lump Sum Allowance) to a £ amount.
+  function resolveDbLump(rawValue, mode){
+    const raw = parseFloat(rawValue) || 0;
+    return mode === 'pct' ? (raw/100 * LUMP_SUM_ALLOWANCE) : raw;
+  }
+
+  function updateDbLumpPreview(){
+    const startAge = parseFloat($('dbStartAge').value);
+    const currentAge = ageFromDOB($('dob').value);
+    const isPast = !isNaN(startAge) && startAge <= currentAge;
+    $('dbLumpLabel').textContent = isPast
+      ? 'Tax-free lump sum already taken with this scheme, if any'
+      : 'Tax-free lump sum you plan to take when this scheme starts, if any';
+    const mode = $('dbLumpMode').value;
+    const raw = parseFloat($('dbLumpTaken').value) || 0;
+    const resolved = resolveDbLump(raw, mode);
+    $('dbLumpPreview').textContent = mode === 'pct' && raw > 0
+      ? `≈ ${gbp(resolved)} (${raw}% of the ${gbp(LUMP_SUM_ALLOWANCE)} allowance)`
+      : '';
+  }
+  ['dbStartAge','dbLumpTaken','dbLumpMode'].forEach(id => {
+    $(id).addEventListener('input', updateDbLumpPreview);
+    $(id).addEventListener('change', updateDbLumpPreview);
+  });
+  updateDbLumpPreview();
+
+  $('addDb').addEventListener('click', () => {
+    const amount = parseFloat($('dbAmount').value);
+    const startAge = parseFloat($('dbStartAge').value);
+    const name = $('dbName').value.trim();
+    const lumpMode = $('dbLumpMode').value;
+    const lumpRaw = parseFloat($('dbLumpTaken').value) || 0;
+    const lumpTaken = resolveDbLump(lumpRaw, lumpMode);
+    if(!amount || amount <= 0 || !startAge || startAge <= 0){ return; }
+    dbPensions.push({name, amount, startAge, lumpTaken, lumpMode, lumpRaw});
+    $('dbAmount').value = '';
+    $('dbStartAge').value = '';
+    $('dbName').value = '';
+    $('dbLumpTaken').value = 0;
+    $('dbLumpMode').value = 'gbp';
+    updateDbLumpPreview();
+    renderDbList();
+    compute();
+  });
+
+  $('addOther').addEventListener('click', () => {
+    const amount = parseFloat($('otherAmount').value);
+    const startAge = parseFloat($('otherStartAge').value);
+    const endAgeRaw = $('otherEndAge').value;
+    const endAge = endAgeRaw === '' ? null : parseFloat(endAgeRaw);
+    const name = $('otherName').value.trim();
+    const taxable = $('otherTaxable').checked;
+    if(!amount || amount <= 0 || !startAge || startAge < 0){ return; }
+    if(endAge != null && endAge <= startAge){ return; }
+    otherIncome.push({name, amount, startAge, endAge, taxable});
+    $('otherAmount').value = '';
+    $('otherStartAge').value = '';
+    $('otherEndAge').value = '';
+    $('otherName').value = '';
+    renderOtherList();
+    compute();
+  });
+
+  // "Spend" always draws from the lump sum, so the source dropdown only matters for "Top up ISA".
+  function updateFundingSourceVisibility(){
+    const wrap = $('fundingSourceWrap');
+    if(wrap) wrap.style.visibility = $('fundingKind').value === 'isa' ? 'visible' : 'hidden';
+  }
+  $('fundingKind').addEventListener('change', updateFundingSourceVisibility);
+  updateFundingSourceVisibility();
+
+  $('addFunding').addEventListener('click', () => {
+    const yearIndex = Number($('fundingYear').value);
+    const kind = $('fundingKind').value;
+    const amount = parseFloat($('fundingAmount').value) || 0;
+    const source = kind === 'isa' ? ($('fundingSource').value || 'lump') : 'lump';
+    const note = $('fundingNote').value.trim();
+    if(isNaN(yearIndex) || amount <= 0){ return; }
+    fundingPlan.push({yearIndex, kind, amount, source, note});
+    $('fundingAmount').value = '';
+    $('fundingNote').value = '';
+    renderFundingList();
+    compute();
+  });
+
+  $('allocFillBtn').addEventListener('click', () => {
+    const pot = Math.max(0, Math.min(100, parseFloat($('allocFillPot').value) || 0));
+    const sav = Math.max(0, Math.min(100, parseFloat($('allocFillSavings').value) || 0));
+    const isa = Math.max(0, Math.min(100, parseFloat($('allocFillIsa').value) || 0));
+    const lump = Math.max(0, Math.min(100, parseFloat($('allocFillLump').value) || 0));
+    resizeAllocTable();
+    drawdownAlloc = drawdownAlloc.map(() => ({pot, sav, isa, lump}));
+    renderAllocTable();
+    compute();
+  });
+
+  ['retireAge','planToAge'].forEach(id => {
+    $(id).addEventListener('change', renderAllocTable);
+    $(id).addEventListener('input', renderAllocTable);
+  });
+
+  ['dob','retireAge','planToAge'].forEach(id => {
+    $(id).addEventListener('change', () => { populateFundingYearSelect(); renderFundingList(); });
+    $(id).addEventListener('input', () => { populateFundingYearSelect(); renderFundingList(); });
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    savingsPreProjected = false;
+    isaPreProjected = false;
+    lumpSums = [];
+    changes = [];
+    salaryChanges = [];
+    dormantDC = [];
+    dbPensions = [];
+    otherIncome = [];
+    fundingPlan = [];
+    drawdownAlloc = [];
+    pensionHistory = [];
+    $('dob').value = defaultDOB();
+    $('retireAge').value = 65;
+    $('salary').value = 35000;
+    $('employeePct').value = 5;
+    $('employerPct').value = 3;
+    $('lowGrowth').value = 3;
+    $('medGrowth').value = 5;
+    $('highGrowth').value = 7;
+    $('desiredIncome').value = 25000;
+    $('reducedAge').value = 80;
+    $('reducedIncome').value = 20000;
+    $('reducedAge2').value = 0;
+    $('reducedIncome2').value = 0;
+    $('reducedAge3').value = 0;
+    $('reducedIncome3').value = 0;
+    $('statePensionAge').value = 67;
+    $('statePension').value = 12548;
+    $('planToAge').value = 90;
+    $('savingsBalance').value = 0;
+    $('savingsMonthly').value = 0;
+    $('isaBalance').value = 0;
+    $('isaMonthly').value = 0;
+    $('isaLowGrowth').value = 3;
+    $('isaMedGrowth').value = 5;
+    $('isaHighGrowth').value = 7;
+    $('tfcPct').value = 0;
+    $('dbLumpTaken').value = 0;
+    $('dbLumpMode').value = 'gbp';
+    updateDbLumpPreview();
+    renderLumpList();
+    renderChangeList();
+    renderSalChgList();
+    renderDormantList();
+    renderDbList();
+    renderOtherList();
+    renderFundingList();
+    renderAllocTable();
+    renderHistoryTable();
+    setNextHistoryDateDefault();
+    compute();
   });
 
   // ---------- core calculation ----------
   // Builds the contribution schedule once (growth-independent), then
   // projects balance under three different monthly growth rates.
   function buildContributionSchedule(){
-    const startYM = readYM('startMonth','startYear') || (nowDefault.year + '-' + nowDefault.month);
+    const startYM = currentStartingPoint().startYM;
     const currentAge = ageFromDOB($('dob').value);
     const retireAge = parseFloat($('retireAge').value) || currentAge;
     const salary0 = parseFloat($('salary').value) || 0;
-    const payRisePct = parseFloat($('payRise').value) || 0;
     const employeePct = parseFloat($('employeePct').value) || 0;
     const employerPct = parseFloat($('employerPct').value) || 0;
 
@@ -958,6 +2095,11 @@
 
     const changeEvents = changes
       .map(c => ({offset: monthOffset(startYM, c.month), pct: c.pct}))
+      .filter(e => e.offset >= 0 && e.offset < totalMonths)
+      .sort((a,b) => a.offset - b.offset);
+
+    const salaryChangeEvents = salaryChanges
+      .map(s => ({offset: monthOffset(startYM, s.month), pct: s.pct}))
       .filter(e => e.offset >= 0 && e.offset < totalMonths)
       .sort((a,b) => a.offset - b.offset);
 
@@ -972,13 +2114,15 @@
     let salary = salary0;
     let currentPct = employeePct + employerPct;
     let changePointer = 0;
+    let salChgPointer = 0;
 
     const monthlyContrib = []; // total contribution (incl. lump) for each month index
     const salaryAtMonth = [];
 
     for(let m = 0; m < totalMonths; m++){
-      if(m > 0 && m % 12 === 0){
-        salary *= (1 + payRisePct/100);
+      while(salChgPointer < salaryChangeEvents.length && salaryChangeEvents[salChgPointer].offset === m){
+        salary = salary * (1 + (parseFloat(salaryChangeEvents[salChgPointer].pct)||0)/100);
+        salChgPointer++;
       }
       while(changePointer < changeEvents.length && changeEvents[changePointer].offset === m){
         currentPct = changeEvents[changePointer].pct;
@@ -990,49 +2134,251 @@
       salaryAtMonth.push(salary);
     }
 
-    return {startYM, totalMonths, monthlyContrib, salaryAtMonth, currentAge, startingBalance: parseFloat($('startingBalance').value) || 0};
+    return {startYM, totalMonths, monthlyContrib, salaryAtMonth, currentAge, startingBalance: currentStartingPoint().startingBalance};
   }
 
-  // simulate annual drawdown of a pot from startAge to endAge given income needs.
-  // Also records the per-year income breakdown (DB / State / DC pot spend) so it
-  // can drive the "where the money comes from" chart without a second pass.
-  function simulateDrawdown(startBalance, annualRatePct, opts){
-    const {desiredIncome, reducedAge, reducedIncome, statePensionAge, statePension, dbPension, dbPensionAge, startAge, endAge} = opts;
+  // Month-by-month value of all dormant/other DC pots (no further contributions), for a given annual growth rate.
+  function dormantSeries(schedule, annualRatePct){
+    const monthlyRate = Math.pow(1 + annualRatePct/100, 1/12) - 1;
+    const series = [];
+    for(let m = 0; m < schedule.totalMonths; m++){
+      let total = 0;
+      dormantDC.forEach(pot => {
+        const bal = parseFloat(pot.balance) || 0;
+        const toStart = monthOffset(pot.month, schedule.startYM);
+        const totalOffset = Math.max(0, toStart) + m + 1;
+        total += bal * Math.pow(1 + monthlyRate, totalOffset);
+      });
+      series.push(total);
+    }
+    return series;
+  }
+  function dormantFinalValue(schedule, annualRatePct){
+    const s = dormantSeries(schedule, annualRatePct);
+    return s.length ? s[s.length-1] : 0;
+  }
+
+  // Month-by-month balance forward to retirement for a given annual growth rate, for a
+  // simple balance + monthly-contribution pot (used for both Savings and ISA).
+  function cashPotSeries(schedule, annualRatePct, balanceId, monthlyId){
+    const monthlyRate = Math.pow(1 + annualRatePct/100, 1/12) - 1;
+    const monthlyAdd = parseFloat($(monthlyId).value) || 0;
+    let balance = parseFloat($(balanceId).value) || 0;
+    const series = [];
+    for(let m = 0; m < schedule.totalMonths; m++){
+      balance = (balance + monthlyAdd) * (1 + monthlyRate);
+      series.push(balance);
+    }
+    return series;
+  }
+  // When a balance has been imported as an already-projected-to-retirement figure (see the
+  // Import buttons in the Savings & ISA card), hold it flat instead of compounding it again —
+  // otherwise growth between "now" and retirement would be counted twice.
+  function savingsSeries(schedule, annualRatePct){
+    if(savingsPreProjected){
+      const bal = parseFloat($('savingsBalance').value) || 0;
+      return new Array(schedule.totalMonths).fill(bal);
+    }
+    return cashPotSeries(schedule, annualRatePct, 'savingsBalance', 'savingsMonthly');
+  }
+  function isaSeries(schedule, annualRatePct){
+    if(isaPreProjected){
+      const bal = parseFloat($('isaBalance').value) || 0;
+      return new Array(schedule.totalMonths).fill(bal);
+    }
+    return cashPotSeries(schedule, annualRatePct, 'isaBalance', 'isaMonthly');
+  }
+  function projectSavingsFinal(schedule, annualRatePct){
+    const s = savingsSeries(schedule, annualRatePct);
+    return s.length ? s[s.length-1] : (parseFloat($('savingsBalance').value) || 0);
+  }
+  function projectIsaFinal(schedule, annualRatePct){
+    const s = isaSeries(schedule, annualRatePct);
+    return s.length ? s[s.length-1] : (parseFloat($('isaBalance').value) || 0);
+  }
+
+  // Builds a sorted list of income-target tiers: the base desired income, plus any
+  // configured "reduce income from age" steps (age <= 0 means that tier is unused).
+  function buildIncomeTiers(){
+    const desiredIncome = parseFloat($('desiredIncome').value) || 0;
+    const tiers = [{age: -Infinity, income: desiredIncome}];
+    [['reducedAge','reducedIncome'], ['reducedAge2','reducedIncome2'], ['reducedAge3','reducedIncome3']].forEach(([ageId, incId]) => {
+      const age = parseFloat($(ageId).value);
+      const income = parseFloat($(incId).value);
+      if(age > 0 && !isNaN(income)){
+        tiers.push({age, income});
+      }
+    });
+    tiers.sort((a,b) => a.age - b.age);
+    return tiers;
+  }
+  function resolveIncomeTarget(tiers, age){
+    let target = tiers[0].income;
+    for(const t of tiers){
+      if(age >= t.age) target = t.income; else break;
+    }
+    return target;
+  }
+
+  // Split `amount` across buckets according to `weights` (fractions, need not sum to 1;
+  // a weight of 0 means that bucket is a hard wall and is never touched), each capped by the
+  // matching entry in `caps`. If a weighted bucket runs dry, the remainder is redistributed
+  // across the other still-weighted, still-open buckets (proportional water-filling) — a
+  // zero-weighted bucket is never dipped into even if others run out first.
+  function allocateAcrossBuckets(amount, weights, caps){
+    const n = weights.length;
+    const spend = new Array(n).fill(0);
+    const active = weights.map(w => w > 0);
+    let remaining = amount;
+    for(let pass = 0; pass < n && remaining > 1e-9; pass++){
+      const activeSum = weights.reduce((s,w,i) => s + (active[i] ? w : 0), 0);
+      if(activeSum <= 1e-9) break;
+      const shares = weights.map((w,i) => active[i] ? remaining * (w/activeSum) : 0);
+      let exhaustedThisPass = false;
+      for(let i = 0; i < n; i++){
+        if(!active[i]) continue;
+        const room = Math.max(0, caps[i] - spend[i]);
+        if(shares[i] > room + 1e-6){
+          spend[i] += room;
+          remaining -= room;
+          active[i] = false;
+          exhaustedThisPass = true;
+        }
+      }
+      if(!exhaustedThisPass){
+        for(let i = 0; i < n; i++){ if(active[i]) spend[i] += shares[i]; }
+        remaining = 0;
+      }
+    }
+    return spend;
+  }
+
+  // simulate annual drawdown of pension pot + savings + ISA (+ an optional explicit tax-free
+  // cash funding plan, medium scenario only) from startAge to endAge given income needs.
+  // Each year's shortfall (beyond DB/State/other income and any funding-plan tax-free spend) is
+  // split between pot/savings/ISA according to that year's row in the drawdown allocation table
+  // (opts.alloc, indexed by year-of-retirement) — a bucket set to 0% for a year is never touched
+  // that year, even if the others run dry. Also records the per-year income breakdown for the
+  // "where the money comes from" chart. The ISA can grow at its own rate (isaRatePct), independent
+  // of the pot/savings rate (annualRatePct) — defaults to the same rate if not given.
+  function simulateDrawdown(potStart, savingsStart, isaStart, annualRatePct, opts, isaRatePct){
+    const {tiers, statePensionAge, statePension, dbPensions, otherIncome, startAge, endAge, fundingPlan: plan = [], taxFreeCashStart = 0, alloc = [], drawdownTaxRatePct = 25} = opts;
     const annualRate = annualRatePct / 100;
-    let balance = startBalance;
+    const isaRate = (isaRatePct == null ? annualRatePct : isaRatePct) / 100;
+    const drawdownTaxRate = Math.max(0, Math.min(99, drawdownTaxRatePct)) / 100;
+    let pot = potStart;
+    let sav = savingsStart;
+    let isa = isaStart;
+    let taxFree = taxFreeCashStart;
     const ages = [startAge];
-    const balances = [Math.round(balance)];
+    const balances = [Math.round(pot + sav + isa + taxFree)];
+    const potBalances = [Math.round(pot)];
+    const savBalances = [Math.round(sav + taxFree)];
+    const isaBalances = [Math.round(isa)];
     const yearAges = [];
     const dbIncomes = [];
     const spIncomes = [];
-    const dcSpends = [];
+    const otherIncomes = [];
+    const taxableOtherIncomes = [];
+    const taxFreeSpends = [];
+    const potSpends = [];
+    const savSpends = [];
+    const isaSpends = [];
+    const drawdownIsaTaxable = []; // gross taxable pot withdrawal used to fund ISA top-ups this year
     const targets = [];
     let depletionAge = null;
 
     for(let age = startAge; age < endAge; age++){
-      const target = age >= reducedAge ? reducedIncome : desiredIncome;
+      const yearIndex = age - startAge;
+      const yearActions = plan.filter(a => a.yearIndex === yearIndex);
+      let taxFreeSpend = 0;
+      let taxableDrawdownToIsa = 0;
+      // Each action for this year is processed independently — you can e.g. spend from the lump
+      // sum AND top up the ISA (from lump sum, savings, or an extra taxable drawdown) in the same
+      // year. A drawdown-sourced top-up is grossed up by the assumed tax rate, so the amount you
+      // entered lands net in the ISA; the gross amount withdrawn feeds the higher-rate tax check.
+      yearActions.forEach(a => {
+        const amount = Math.max(0, a.amount || 0);
+        if(amount <= 0) return;
+        if(a.kind === 'spend'){
+          const spend = Math.min(amount, taxFree);
+          taxFree -= spend;
+          taxFreeSpend += spend;
+        } else if(a.kind === 'isa'){
+          const source = a.source || 'lump';
+          let toIsa = 0;
+          if(source === 'savings'){
+            toIsa = Math.min(amount, sav);
+            sav -= toIsa;
+          } else if(source === 'drawdown'){
+            const grossWanted = amount / (1 - drawdownTaxRate);
+            const grossTaken = Math.min(grossWanted, pot);
+            pot -= grossTaken;
+            toIsa = grossTaken * (1 - drawdownTaxRate);
+            taxableDrawdownToIsa += grossTaken;
+          } else {
+            toIsa = Math.min(amount, taxFree);
+            taxFree -= toIsa;
+          }
+          isa += toIsa;
+        }
+      });
+      // note: any tax-free cash left unallocated by the funding plan is NOT auto-swept anywhere —
+      // it stays in its own pile (0% growth) and is only spent down via the "Lump sum %" column
+      // of the drawdown allocation table below, in whichever year(s) you choose.
+
+      const target = resolveIncomeTarget(tiers, age);
       const spIncome = age >= statePensionAge ? statePension : 0;
-      const dbIncome = age >= dbPensionAge ? dbPension : 0;
-      const neededFromPot = Math.max(0, target - spIncome - dbIncome);
-      const dcSpend = Math.min(neededFromPot, balance);
+      const dbIncome = dbPensions.reduce((s,d) => s + (age >= d.startAge ? d.amount : 0), 0);
+      const otherInc = otherIncome.reduce((s,o) => s + ((age >= o.startAge && (o.endAge == null || age <= o.endAge)) ? o.amount : 0), 0);
+      const taxableOtherInc = otherIncome.reduce((s,o) => s + ((o.taxable !== false && age >= o.startAge && (o.endAge == null || age <= o.endAge)) ? o.amount : 0), 0);
+      const needed = Math.max(0, target - spIncome - dbIncome - otherInc - taxFreeSpend);
+      // Each year's split between pot/savings/ISA/lump-sum comes from the drawdown allocation
+      // table — a bucket set to 0% for this year is a hard wall (never drawn on), even if the
+      // others run dry; if a nonzero bucket runs dry first, the remainder redistributes across
+      // the other nonzero buckets for that year only.
+      const allocRow = alloc[yearIndex] || {pot: 100, sav: 0, isa: 0, lump: 0};
+      const rawPot = Math.max(0, allocRow.pot || 0);
+      const rawSav = Math.max(0, allocRow.sav || 0);
+      const rawIsa = Math.max(0, allocRow.isa || 0);
+      const rawLump = Math.max(0, allocRow.lump || 0);
+      const pctSum = rawPot + rawSav + rawIsa + rawLump;
+      const weights = pctSum > 0 ? [rawPot/pctSum, rawSav/pctSum, rawIsa/pctSum, rawLump/pctSum] : [1, 0, 0, 0];
+      const buckets = [pot, sav, isa, taxFree];
+      const totalAvail = weights.reduce((s,w,i) => s + (w > 0 ? buckets[i] : 0), 0);
+      const actualSpend = Math.min(needed, totalAvail);
+      const spendArr = allocateAcrossBuckets(actualSpend, weights, buckets);
+      let potSpend = spendArr[0], savSpend = spendArr[1], isaSpend = spendArr[2], lumpSpend = spendArr[3];
 
       yearAges.push(age);
       dbIncomes.push(dbIncome);
       spIncomes.push(spIncome);
-      dcSpends.push(Math.round(dcSpend));
+      otherIncomes.push(otherInc);
+      taxableOtherIncomes.push(taxableOtherInc);
+      taxFreeSpends.push(Math.round(taxFreeSpend + lumpSpend));
+      potSpends.push(Math.round(potSpend));
+      savSpends.push(Math.round(savSpend));
+      isaSpends.push(Math.round(isaSpend));
+      drawdownIsaTaxable.push(Math.round(taxableDrawdownToIsa));
       targets.push(target);
 
-      balance -= dcSpend;
-      if(dcSpend < neededFromPot && depletionAge === null){
+      pot -= potSpend;
+      sav -= savSpend;
+      isa -= isaSpend;
+      taxFree -= lumpSpend;
+      if(actualSpend < needed && depletionAge === null){
         depletionAge = age + 1;
       }
-      if(balance > 0){
-        balance *= (1 + annualRate);
-      }
+      if(pot > 0) pot *= (1 + annualRate);
+      if(sav > 0) sav *= (1 + annualRate);
+      if(isa > 0) isa *= (1 + isaRate);
       ages.push(age + 1);
-      balances.push(Math.round(balance));
+      balances.push(Math.round(pot + sav + isa + taxFree));
+      potBalances.push(Math.round(pot));
+      savBalances.push(Math.round(sav + taxFree));
+      isaBalances.push(Math.round(isa));
     }
-    return {ages, balances, depletionAge, yearAges, dbIncomes, spIncomes, dcSpends, targets};
+    return {ages, balances, potBalances, savBalances, isaBalances, depletionAge, yearAges, dbIncomes, spIncomes, otherIncomes, taxableOtherIncomes, taxFreeSpends, potSpends, savSpends, isaSpends, drawdownIsaTaxable, targets};
   }
 
   function projectBalance(schedule, annualRatePct){
@@ -1052,44 +2398,83 @@
     const lowPct = parseFloat($('lowGrowth').value) || 0;
     const medPct = parseFloat($('medGrowth').value) || 0;
     const highPct = parseFloat($('highGrowth').value) || 0;
+    // ISA growth is independent of the pension's low/medium/high assumptions (it may be
+    // invested more or less aggressively) — falls back to the pension rate if left blank.
+    const isaLowPct = parseFloat($('isaLowGrowth').value);
+    const isaMedPct = parseFloat($('isaMedGrowth').value);
+    const isaHighPct = parseFloat($('isaHighGrowth').value);
+    const isaLowRate = isNaN(isaLowPct) ? lowPct : isaLowPct;
+    const isaMedRate = isNaN(isaMedPct) ? medPct : isaMedPct;
+    const isaHighRate = isNaN(isaHighPct) ? highPct : isaHighPct;
 
     const lowSeries = projectBalance(schedule, lowPct);
     const medSeries = projectBalance(schedule, medPct);
     const highSeries = projectBalance(schedule, highPct);
 
-    // cumulative contributions (growth-independent)
+    // reconstruct true contributed-vs-growth from the logged valuation history, so the live
+    // scheme's cumulative "contributed" total starts from that (not from treating the most
+    // recent valuation as 100% principal) — this is what lets the charts below correctly show
+    // historical growth as growth, not contributions.
+    const histSummary = historicalSummary();
+    const histPoints = histSummary.points; // [{date, value, cumContrib, paidIn, growth}] one per logged row
+
+    // cumulative contributions (growth-independent) for the live scheme
     const contribSeries = [];
-    let cum = schedule.startingBalance;
+    let cum = histSummary.contrib;
     for(let m = 0; m < schedule.totalMonths; m++){
       cum += schedule.monthlyContrib[m];
       contribSeries.push(Math.round(cum));
     }
 
-    // labels
+    // labels — one entry per year, both charts below share this cadence so history (which is
+    // only ever logged annually) and the forward projection sit at matching, proportional
+    // spacing instead of a few sparse historical points getting lost against hundreds of dense
+    // monthly ones
     const [sy, sm] = schedule.startYM.split('-').map(Number);
-    const labels = [];
     const yearLabels = [];
     const yearContrib = [];
     const yearGrowth = [];
+    const yearHigh = [];
+    const yearMed = [];
+    const yearLow = [];
     for(let m = 0; m < schedule.totalMonths; m++){
-      const d = new Date(sy, sm - 1 + m + 1, 1);
-      labels.push(d.toLocaleDateString('en-GB', {month:'short', year:'2-digit'}));
       if((m+1) % 12 === 0){
-        const yr = (m+1)/12;
-        yearLabels.push('Year ' + yr);
+        const d = new Date(sy, sm - 1 + m + 1, 1);
+        // label each forward year-mark with its actual calendar date (same style as the
+        // historical rows), so the whole axis reads as one continuous date sequence instead
+        // of switching to "Year 1", "Year 2"
+        const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+        yearLabels.push(fmtMonthShort(ym));
         yearContrib.push(contribSeries[m]);
         yearGrowth.push(medSeries[m] - contribSeries[m]);
+        yearHigh.push(highSeries[m]);
+        yearMed.push(medSeries[m]);
+        yearLow.push(lowSeries[m]);
       }
     }
     // partial final year if totalMonths not a multiple of 12
     if(schedule.totalMonths % 12 !== 0){
       const lastIdx = schedule.totalMonths - 1;
-      yearLabels.push('Retirement');
+      const d = new Date(sy, sm - 1 + lastIdx + 1, 1);
+      const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      yearLabels.push(fmtMonthShort(ym) + ' (retirement)');
       yearContrib.push(contribSeries[lastIdx]);
       yearGrowth.push(medSeries[lastIdx] - contribSeries[lastIdx]);
+      yearHigh.push(highSeries[lastIdx]);
+      yearMed.push(medSeries[lastIdx]);
+      yearLow.push(lowSeries[lastIdx]);
     }
 
-    // allowance check (employee+employer+lump per rolling 12 months) vs £60,000
+    // prepend your logged history so the axis is one continuous date sequence. Bars are running
+    // totals (like the forward years already are) — not the single period's own contribution —
+    // so the very first entry (when the pension started) is 100% contribution (its whole value,
+    // since we don't know its own composition), and each subsequent bar is that running total
+    // plus the period's contribution, with growth-to-date stacked on top.
+    const histBarLabels = histPoints.map(p => fmtMonthShort(p.date));
+    const histBarContrib = histPoints.map(p => Math.round(p.cumContrib));
+    const histBarGrowth = histPoints.map(p => Math.round(p.value - p.cumContrib));
+
+    // allowance check (employee+employer+lump per rolling 12 months) vs £60,000 -- live scheme only
     let maxRolling = 0;
     for(let i = 0; i < schedule.monthlyContrib.length; i++){
       let sum = 0;
@@ -1101,81 +2486,183 @@
     const allowanceEl = $('allowanceWarning');
     if(maxRolling > 60000){
       allowanceEl.style.display = 'block';
-      allowanceEl.textContent = `⚠ At points in this plan, combined contributions in a 12-month period reach ~${gbp(maxRolling)}, above the current £60,000/year pension Annual Allowance. You may face a tax charge on the excess — check tapering/MPAA rules if this applies to you.`;
+      allowanceEl.textContent = `⚠ At points in this plan, combined contributions to your live scheme in a 12-month period reach ~${gbp(maxRolling)}, above the current £60,000/year pension Annual Allowance. You may face a tax charge on the excess — check tapering/MPAA rules if this applies to you.`;
     } else {
       allowanceEl.style.display = 'none';
     }
 
-    const step = schedule.totalMonths > 36 ? 6 : (schedule.totalMonths > 12 ? 3 : 1);
-    const displayLabels = labels.map((l, i) => (i % step === 0 || i === labels.length-1) ? l : '');
+    // prepend the logged valuation history (as an "actual value" line, plus the true cumulative
+    // contributed total) ahead of the forward-projected years, both at the same one-point-per-
+    // year cadence, so the historical portion isn't squeezed into an invisible sliver against
+    // hundreds of monthly forward points
+    const histChartLabels = histPoints.map(p => fmtMonthShort(p.date));
+    const histNulls = new Array(histPoints.length).fill(null);
+    const yearNulls = new Array(yearLabels.length).fill(null);
 
-    growthChart.data.labels = displayLabels;
-    growthChart.data.datasets[0].data = highSeries;
-    growthChart.data.datasets[1].data = medSeries;
-    growthChart.data.datasets[2].data = lowSeries;
-    growthChart.data.datasets[3].data = contribSeries;
+    growthChart.data.labels = [...histChartLabels, ...yearLabels];
+    growthChart.data.datasets[0].data = [...histNulls, ...yearHigh];
+    growthChart.data.datasets[1].data = [...histNulls, ...yearMed];
+    growthChart.data.datasets[2].data = [...histNulls, ...yearLow];
+    growthChart.data.datasets[3].data = [...histPoints.map(p => Math.round(p.cumContrib)), ...yearContrib];
+    growthChart.data.datasets[4].data = [...histPoints.map(p => Math.round(p.value)), ...yearNulls];
     growthChart.update();
 
-    barChart.data.labels = yearLabels;
-    barChart.data.datasets[0].data = yearContrib;
-    barChart.data.datasets[1].data = yearGrowth;
+    barChart.data.labels = [...histBarLabels, ...yearLabels];
+    barChart.data.datasets[0].data = [...histBarContrib, ...yearContrib];
+    barChart.data.datasets[1].data = [...histBarGrowth, ...yearGrowth];
     barChart.update();
 
-    const finalContrib = contribSeries[contribSeries.length-1] || schedule.startingBalance;
-    const finalMed = medSeries[medSeries.length-1] || schedule.startingBalance;
+    const liveContrib = contribSeries[contribSeries.length-1] || histSummary.contrib;
+    const liveLow = lowSeries[lowSeries.length-1] || schedule.startingBalance;
+    const liveMed = medSeries[medSeries.length-1] || schedule.startingBalance;
+    const liveHigh = highSeries[highSeries.length-1] || schedule.startingBalance;
+
+    // dormant DC pots, added into totals at retirement
+    const dormantLow = dormantFinalValue(schedule, lowPct);
+    const dormantMed = dormantFinalValue(schedule, medPct);
+    const dormantHigh = dormantFinalValue(schedule, highPct);
+    const dormantStartingSum = dormantDC.reduce((s,d) => s + (parseFloat(d.balance)||0), 0);
+
+    // combined (live + dormant) medium-growth monthly balance, month 0 -> retirement — used by the
+    // dashboard's pension mini-chart and combined net-worth-over-time timeline
+    const dormantMedMonthly = dormantSeries(schedule, medPct);
+    const combinedMedMonthly = medSeries.map((v, m) => v + (dormantMedMonthly[m] || 0));
+
+    const finalContrib = liveContrib + dormantStartingSum;
+    const finalLow = liveLow + dormantLow;
+    const finalMed = liveMed + dormantMed;
+    const finalHigh = liveHigh + dormantHigh;
     const finalGrowthMed = finalMed - finalContrib;
 
     doughnutChart.data.datasets[0].data = [finalContrib, Math.max(finalGrowthMed,0)];
     doughnutChart.update();
-
-    const finalLow = lowSeries[lowSeries.length-1] || schedule.startingBalance;
-    const finalHigh = highSeries[highSeries.length-1] || schedule.startingBalance;
 
     $('statContrib').textContent = gbp(finalContrib);
     $('statLow').textContent = gbp(finalLow);
     $('statMed').textContent = gbp(finalMed);
     $('statHigh').textContent = gbp(finalHigh);
 
-    // ---------- required cash & cash journey ----------
-    const desiredIncome = parseFloat($('desiredIncome').value) || 0;
-    const withdrawalRate = parseFloat($('withdrawalRate').value) || 4;
-    const reducedAge = parseFloat($('reducedAge').value) || 999;
-    const reducedIncome = parseFloat($('reducedIncome').value) || 0;
-    const dbPension = parseFloat($('dbPension').value) || 0;
-    const dbPensionAge = parseFloat($('dbPensionAge').value) || 65;
+    // ---------- savings & ISA projection (two separate pots) ----------
+    const savLowSeries = savingsSeries(schedule, lowPct);
+    const savMedSeries = savingsSeries(schedule, medPct);
+    const savHighSeries = savingsSeries(schedule, highPct);
+    const savingsLow = savLowSeries.length ? savLowSeries[savLowSeries.length-1] : (parseFloat($('savingsBalance').value)||0);
+    const savingsMed = savMedSeries.length ? savMedSeries[savMedSeries.length-1] : (parseFloat($('savingsBalance').value)||0);
+    const savingsHigh = savHighSeries.length ? savHighSeries[savHighSeries.length-1] : (parseFloat($('savingsBalance').value)||0);
+
+    const isaLowSeries = isaSeries(schedule, isaLowRate);
+    const isaMedSeries = isaSeries(schedule, isaMedRate);
+    const isaHighSeries = isaSeries(schedule, isaHighRate);
+    const isaLow = isaLowSeries.length ? isaLowSeries[isaLowSeries.length-1] : (parseFloat($('isaBalance').value)||0);
+    const isaMed = isaMedSeries.length ? isaMedSeries[isaMedSeries.length-1] : (parseFloat($('isaBalance').value)||0);
+    const isaHigh = isaHighSeries.length ? isaHighSeries[isaHighSeries.length-1] : (parseFloat($('isaBalance').value)||0);
+
+    $('savingsOutput').innerHTML = `Projected at retirement — Savings: <b style="color:var(--low)">Low ${gbp(savingsLow)}</b> · <b style="color:var(--med)">Medium ${gbp(savingsMed)}</b> · <b style="color:var(--high)">High ${gbp(savingsHigh)}</b><br>` +
+      `Projected at retirement — ISA: <b style="color:var(--low)">Low ${gbp(isaLow)}</b> · <b style="color:var(--med)">Medium ${gbp(isaMed)}</b> · <b style="color:var(--high)">High ${gbp(isaHigh)}</b>`;
+
+    // ---------- total wealth at retirement (pension incl. dormant + savings + ISA) ----------
+    $('statWealthLow').textContent = gbp(finalLow + savingsLow + isaLow);
+    $('statWealthMed').textContent = gbp(finalMed + savingsMed + isaMed);
+    $('statWealthHigh').textContent = gbp(finalHigh + savingsHigh + isaHigh);
+
+    // ---------- cash journey ----------
+    const tiers = buildIncomeTiers();
     const statePensionAge = parseFloat($('statePensionAge').value) || 67;
     const statePension = parseFloat($('statePension').value) || 0;
     const planToAge = parseFloat($('planToAge').value) || 90;
     const retireAge = parseFloat($('retireAge').value) || 65;
+    const dbTotal = dbPensions.reduce((s,d) => s + (parseFloat(d.amount)||0), 0);
 
-    // required pot covers the gap between desired income and your guaranteed
-    // pensions (State + DB), once both are in payment — a rough 4%-rule style target
-    const guaranteedIncome = statePension + dbPension;
-    const incomeGap = Math.max(0, desiredIncome - guaranteedIncome);
-    const requiredPot = withdrawalRate > 0 ? (incomeGap / (withdrawalRate/100)) : 0;
+    // ---------- tax-free lump sum at retirement ----------
+    const dbLumpTotal = dbPensions.reduce((s,d) => s + (parseFloat(d.lumpTaken)||0), 0);
+    const remainingAllowance = Math.max(0, LUMP_SUM_ALLOWANCE - dbLumpTotal);
+    const tfcPct = Math.min(25, Math.max(0, parseFloat($('tfcPct').value) || 0));
 
-    $('statRequired').textContent = gbp(requiredPot);
-    const gap = finalMed - requiredPot;
-    const gapCard = $('statGapCard');
-    gapCard.className = 'stat ' + (gap >= 0 ? 'gap-pos' : 'gap-neg');
-    $('statGap').textContent = (gap >= 0 ? '+' : '') + gbp(gap);
+    const maxHintEl = $('tfcMaxHint');
+    if(dbLumpTotal > 0){
+      const equivPct = finalMed > 0 ? Math.min(25, (remainingAllowance/finalMed)*100) : 25;
+      maxHintEl.innerHTML = `New maximum after DB lump sums: <b>${gbp(remainingAllowance)}</b> remaining ` +
+        `(down from ${gbp(LUMP_SUM_ALLOWANCE)}) — about <b>${equivPct.toFixed(1)}%</b> of your medium-scenario pension pot, still capped at 25% regardless.`;
+    } else {
+      maxHintEl.textContent = `Full allowance of ${gbp(LUMP_SUM_ALLOWANCE)} available — add a DB lump sum above to see it reduced.`;
+    }
 
-    const reqSummaryEl = $('reqSummary');
-    const gapWord = gap >= 0 ? 'surplus' : 'shortfall';
-    reqSummaryEl.innerHTML =
-      `To sustain <b>${gbp(desiredIncome)}</b>/year on top of <b>${gbp(guaranteedIncome)}</b>/year from State + DB pension, ` +
-      `you'd need roughly <b style="color:var(--warn)">${gbp(requiredPot)}</b> invested at retirement (at a ${withdrawalRate}% withdrawal rate). ` +
-      `Your projected pots: <b style="color:var(--low)">Low ${gbp(finalLow)}</b> · <b style="color:var(--med)">Medium ${gbp(finalMed)}</b> · <b style="color:var(--high)">High ${gbp(finalHigh)}</b> ` +
-      `— a ${gapWord} of <b style="color:${gap >= 0 ? 'var(--high)' : 'var(--danger)'}">${gbp(Math.abs(gap))}</b> on the medium scenario.`;
+    function applyTfc(pot, savings){
+      const raw = pot * tfcPct/100;
+      const capped = Math.min(raw, remainingAllowance);
+      return {pot: pot - capped, savings: savings + capped, capped};
+    }
+    const tfcLow = applyTfc(finalLow, savingsLow);
+    const tfcMed = applyTfc(finalMed, savingsMed);
+    const tfcHigh = applyTfc(finalHigh, savingsHigh);
 
-    // cash journey: draw down each scenario's pot from retirement to planToAge
+    const tfcSummaryEl = $('tfcSummary');
+    if(dbLumpTotal > 0 || tfcPct > 0){
+      tfcSummaryEl.innerHTML =
+        `Lump Sum Allowance: <b>${gbp(LUMP_SUM_ALLOWANCE)}</b>` +
+        (dbLumpTotal > 0 ? ` minus <b>${gbp(dbLumpTotal)}</b> already taken via DB scheme(s) = <b>${gbp(remainingAllowance)}</b> remaining.` : ' available.') +
+        (tfcPct > 0
+          ? ` Taking ${tfcPct}% of your pension pot moves <b style="color:var(--low)">${gbp(tfcLow.capped)}</b> (low) · <b style="color:var(--med)">${gbp(tfcMed.capped)}</b> (medium) · <b style="color:var(--high)">${gbp(tfcHigh.capped)}</b> (high) tax-free into savings at retirement, leaving the rest in your pension pot to keep growing/drawing down.` +
+            (tfcMed.capped < finalMed * tfcPct/100 ? ` Capped by your remaining allowance on at least one scenario.` : '')
+          : ` Set "Take tax-free lump sum" above 0% to move some of your pot into savings at retirement.`);
+    } else {
+      tfcSummaryEl.innerHTML = `Lump Sum Allowance: <b>${gbp(LUMP_SUM_ALLOWANCE)}</b> available. Set "Take tax-free lump sum" above 0% to move some of your pension pot into savings — tax-free — at retirement.`;
+    }
+
+    wealthDoughnutChart.data.datasets[0].data = [Math.max(tfcMed.pot,0), Math.max(savingsMed + isaMed,0), Math.max(tfcMed.capped,0)];
+    wealthDoughnutChart.update();
+
+    const dbTotalForStrap = dbTotal;
+    let straplineText = `Investable wealth only — your pension pot (live + dormant) plus savings/ISA. `;
+    const straplineBits = [];
+    if(dbTotalForStrap > 0) straplineBits.push(`${gbp(dbTotalForStrap)}/yr from DB pension(s)`);
+    if(statePension > 0) straplineBits.push(`${gbp(statePension)}/yr State Pension from age ${statePensionAge}`);
+    straplineText += straplineBits.length
+      ? `On top of this, you'd also receive ${straplineBits.join(' and ')} — shown separately in the retirement income charts below.`
+      : `Add DB pensions above, and a State Pension figure below, to see other guaranteed income on top of this.`;
+    $('wealthStrapline').textContent = straplineText;
+
+    // cash journey: draw down each scenario's pension pot + savings from retirement to planToAge
     const startAge = Math.max(Math.round(retireAge), 1);
     const endAge = Math.max(startAge, Math.round(planToAge));
-    const drawdownOpts = {desiredIncome, reducedAge, reducedIncome, statePensionAge, statePension, dbPension, dbPensionAge, startAge, endAge};
+    resizeAllocTable(); // keep the drawdown allocation array sized to match, without redrawing the table
+    const alloc = drawdownAlloc;
+    const drawdownTaxRatePct = Math.max(0, Math.min(60, parseFloat($('drawdownTaxRate').value) || 0));
+    const drawdownOpts = {tiers, statePensionAge, statePension, dbPensions, otherIncome, startAge, endAge, alloc, drawdownTaxRatePct};
 
-    const lowJourney = simulateDrawdown(finalLow, lowPct, drawdownOpts);
-    const medJourney = simulateDrawdown(finalMed, medPct, drawdownOpts);
-    const highJourney = simulateDrawdown(finalHigh, highPct, drawdownOpts);
+    // the retirement funding plan only applies to the medium scenario, and only once it has rows —
+    // otherwise the medium journey behaves exactly as before (tax-free cash pre-merged into savings)
+    const hasFundingPlan = fundingPlan.length > 0;
+    const medSavingsStart = hasFundingPlan ? savingsMed : tfcMed.savings;
+    const medTaxFreeStart = hasFundingPlan ? tfcMed.capped : 0;
+
+    // only "spend" actions + lump-sum-sourced ISA top-ups actually draw down the tax-free lump
+    // sum pile — ISA top-ups sourced from savings or drawdown don't touch it.
+    const fundingAllocated = fundingPlan.reduce((s,f) => {
+      if(f.kind === 'spend') return s + (f.amount || 0);
+      if(f.kind === 'isa' && (f.source || 'lump') === 'lump') return s + (f.amount || 0);
+      return s;
+    }, 0);
+    const fundingRemaining = Math.max(0, tfcMed.capped - fundingAllocated);
+    const fundingOutputEl = $('fundingPlanOutput');
+    if(tfcMed.capped <= 0){
+      fundingOutputEl.textContent = 'No tax-free lump sum taken yet — set one in the "At retirement" section above to unlock this.';
+    } else if(!hasFundingPlan){
+      fundingOutputEl.innerHTML = `<b>${gbp(tfcMed.capped)}</b> available to allocate (medium scenario). Add rows below to plan how it's spent, year by year.`;
+    } else {
+      const overAllocated = fundingAllocated > tfcMed.capped;
+      fundingOutputEl.innerHTML = `Allocated <b>${gbp(Math.min(fundingAllocated, tfcMed.capped))}</b> of <b>${gbp(tfcMed.capped)}</b>` +
+        (fundingRemaining > 0 ? ` — <b>${gbp(fundingRemaining)}</b> left unallocated (stays as tax-free cash, 0% growth, until you spend it via the "Lump sum %" column in Drawdown allocation below).` : ' — fully allocated.') +
+        (overAllocated ? ` <span style="color:var(--danger)">Your rows ask for more than is available — later rows will be capped.</span>` : '');
+    }
+
+    const medDrawdownOpts = {...drawdownOpts, fundingPlan, taxFreeCashStart: medTaxFreeStart};
+
+    const lowJourney = simulateDrawdown(tfcLow.pot, tfcLow.savings, isaLow, lowPct, drawdownOpts, isaLowRate);
+    const medJourney = simulateDrawdown(tfcMed.pot, medSavingsStart, isaMed, medPct, medDrawdownOpts, isaMedRate);
+    const highJourney = simulateDrawdown(tfcHigh.pot, tfcHigh.savings, isaHigh, highPct, drawdownOpts, isaHighRate);
+
+    renderTaxCheck(medJourney, startAge);
 
     journeyChart.data.labels = medJourney.ages.map(String);
     journeyChart.data.datasets[0].data = highJourney.balances;
@@ -1194,75 +2681,275 @@
       describeJourney('Medium', medJourney),
       describeJourney('Low', lowJourney)
     ].join('   ·   ');
-    if(medJourney.depletionAge !== null && medJourney.depletionAge <= reducedAge){
-      noteText += ` — note: the medium pot runs out before age ${reducedAge}, so "reduce income from age" has no effect there.`;
+    const earliestTierAge = tiers.filter(t => t.age > 0).reduce((min,t) => Math.min(min, t.age), Infinity);
+    if(medJourney.depletionAge !== null && isFinite(earliestTierAge) && medJourney.depletionAge <= earliestTierAge){
+      noteText += ` — note: the medium scenario runs out before age ${earliestTierAge}, so your "reduce income" step(s) have no effect there.`;
     }
     noteEl.textContent = noteText;
     noteEl.style.color = 'var(--muted)';
+
+    // wealth mix in retirement (medium scenario): pension pot, savings, and ISA as separate lines
+    wealthMixChart.data.labels = medJourney.ages.map(String);
+    wealthMixChart.data.datasets[0].data = medJourney.potBalances;
+    wealthMixChart.data.datasets[1].data = medJourney.savBalances;
+    wealthMixChart.data.datasets[2].data = medJourney.isaBalances;
+    wealthMixChart.update();
+    const mixNoteEl = $('wealthMixNote');
+    mixNoteEl.textContent = `Drawn down according to your Drawdown allocation table (Pot/Savings/ISA %, per year). Savings line includes any unallocated tax-free cash from your funding plan.`;
 
     // where the money comes from each year (medium scenario)
     incomeSourceChart.data.labels = medJourney.yearAges.map(String);
     incomeSourceChart.data.datasets[0].data = medJourney.dbIncomes;
     incomeSourceChart.data.datasets[1].data = medJourney.spIncomes;
-    incomeSourceChart.data.datasets[2].data = medJourney.dcSpends;
-    incomeSourceChart.data.datasets[3].data = medJourney.targets;
+    incomeSourceChart.data.datasets[2].data = medJourney.otherIncomes;
+    incomeSourceChart.data.datasets[3].data = medJourney.taxFreeSpends;
+    incomeSourceChart.data.datasets[4].data = medJourney.potSpends;
+    incomeSourceChart.data.datasets[5].data = medJourney.savSpends;
+    incomeSourceChart.data.datasets[6].data = medJourney.isaSpends;
+    incomeSourceChart.data.datasets[7].data = medJourney.targets;
     incomeSourceChart.update();
 
     const isNoteEl = $('incomeSourceNote');
     if(medJourney.depletionAge !== null){
-      isNoteEl.textContent = `⚠ From age ${medJourney.depletionAge}, the pot can no longer cover the gap — total income falls short of the dashed "required income" line.`;
+      isNoteEl.textContent = `⚠ From age ${medJourney.depletionAge}, your pot + savings can no longer cover the gap — total income falls short of the dashed "required income" line.`;
       isNoteEl.style.color = 'var(--danger)';
     } else {
-      isNoteEl.textContent = `The dashed line shows your required income target; bars show it's fully covered by DB + State pension + pot spend throughout.`;
+      isNoteEl.textContent = `The dashed line shows your required income target; bars show it's fully covered by DB + State pension + pot/savings spend throughout.`;
       isNoteEl.style.color = 'var(--muted)';
     }
+
+    const rdForExport = retirementDate();
 
     lastResults = {
       currentAge,
       retireAge,
+      retirementDate: rdForExport ? rdForExport.toISOString().slice(0,10) : null,
       totalMonths: schedule.totalMonths,
       startingBalance: schedule.startingBalance,
-      totalContributed: finalContrib,
-      potLow: finalLow,
-      potMedium: finalMed,
-      potHigh: finalHigh,
-      requiredPot,
-      gapVsMedium: gap,
+      liveScheme: {contributed: liveContrib, low: liveLow, medium: liveMed, high: liveHigh},
+      dormantSchemes: {startingSum: dormantStartingSum, low: dormantLow, medium: dormantMed, high: dormantHigh, count: dormantDC.length},
+      pensionTotal: {contributed: finalContrib, low: finalLow, medium: finalMed, high: finalHigh},
+      savings: {low: savingsLow, medium: savingsMed, high: savingsHigh},
+      isa: {low: isaLow, medium: isaMed, high: isaHigh},
+      dbPensionsAnnualTotal: dbTotal,
+      otherIncomeCount: otherIncome.length,
+      statePensionAnnual: statePension,
+      taxFreeCash: {
+        allowance: LUMP_SUM_ALLOWANCE,
+        alreadyTakenViaDb: dbLumpTotal,
+        remainingAllowance,
+        pctRequested: tfcPct,
+        movedToSavings: {low: tfcLow.capped, medium: tfcMed.capped, high: tfcHigh.capped}
+      },
+      totalAssetsMedium: finalMed + savingsMed,
       annualAllowanceWarning: maxRolling > 60000,
-      medianPotDepletesInRetirement: medJourney.depletionAge !== null,
+      medianDepletesInRetirement: medJourney.depletionAge !== null,
+      fundingPlan: {rows: fundingPlan.length, allocated: fundingAllocated, availableMedium: tfcMed.capped},
+      // accumulation-phase (live + dormant) monthly medium-growth series, month 0 -> retirement —
+      // used by the dashboard's pension mini-chart and combined net-worth-over-time timeline
       series: {
-        medSeries
+        medSeries: combinedMedMonthly
+      },
+      // series for the dashboard's "where the money comes from each year" and "wealth mix in
+      // retirement" charts (medium scenario) — mirrors what incomeSourceChart/wealthMixChart draw
+      wealthMixSeries: {
+        ages: medJourney.ages,
+        potBalances: medJourney.potBalances,
+        savBalances: medJourney.savBalances,
+        isaBalances: medJourney.isaBalances
+      },
+      incomeSourceSeries: {
+        ages: medJourney.yearAges,
+        dbIncomes: medJourney.dbIncomes,
+        spIncomes: medJourney.spIncomes,
+        otherIncomes: medJourney.otherIncomes,
+        taxFreeSpends: medJourney.taxFreeSpends,
+        potSpends: medJourney.potSpends,
+        savSpends: medJourney.savSpends,
+        isaSpends: medJourney.isaSpends,
+        targets: medJourney.targets
       }
     };
 
     renderLumpList();
     renderChangeList();
+    renderSalChgList();
+    renderDormantList();
+    renderDbList();
+    renderOtherList();
+    renderFundingList();
     saveNow();
   }
 
+  // The export bundles both a human-readable summary AND the full input state (under `state`),
+  // so this single file can also be re-imported on another device/browser — same pattern as the
+  // other Phillips Finance trackers.
   $('exportData').addEventListener('click', () => {
-    downloadJSON('pension-summary.json', {
-      tracker: 'pension',
+    downloadJSON('retirement-plan-summary.json', {
+      tracker: 'retirement-planner',
       exportedAt: new Date().toISOString(),
       ...lastResults,
-      state: buildState()
+      state: buildStateObject()
+    });
+  });
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'retirement-planner'){
+          alert("That doesn't look like a summary file from this Retirement Planner.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it first.');
+          return;
+        }
+        restoreState(parsed.state);
+      }catch(err){
+        alert("Could not read that file — make sure it's the JSON exported from this tracker.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // ---------- import from the Savings / ISA trackers, projected to this planner's retirement date ----------
+  // The Savings tracker has no growth model of its own — it just logs actual balances — so
+  // "projected" there just means its current total, held flat (no further growth) until retirement.
+  $('importSavingsBtn').addEventListener('click', () => $('importSavingsFile').click());
+  $('importSavingsFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'savings'){
+          alert("That doesn't look like a summary file from the Savings tracker.");
+          return;
+        }
+        if(parsed.totalNow == null){
+          alert('This file doesn\'t have a current total — please re-export it from the Savings tracker first.');
+          return;
+        }
+        $('savingsBalance').value = Math.round(parsed.totalNow);
+        $('savingsMonthly').value = 0;
+        savingsPreProjected = true;
+        $('savingsImportNote').textContent = `Imported ${gbp(parsed.totalNow)} (current total, held flat to retirement — the Savings tracker doesn't forecast growth). Edit the balance/monthly fields above to go back to manual projection.`;
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from the Savings tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // The ISA tracker DOES have its own growth model (start balance, monthly contribution, lump
+  // sums, scheduled increases, growth rate) — so here we replay that same month-by-month
+  // compounding forward to this planner's actual retirement date (which may be further out than
+  // the ISA tracker's own configured "years" horizon), rather than just reading its exported chart.
+  function projectIsaStateTo(state, targetMonths){
+    const startYM = (state.startYear || nowDefault.year) + '-' + (state.startMonth || nowDefault.month);
+    let balance = parseFloat(state.startingBalance) || 0;
+    if(targetMonths <= 0) return balance;
+    let currentMonthly = parseFloat(state.baseMonthly) || 0;
+    const annualRate = (parseFloat(state.growth) || 0) / 100;
+    const monthlyRate = Math.pow(1 + annualRate, 1/12) - 1;
+    const increases = Array.isArray(state.increases) ? state.increases : [];
+    const lumpSumsIsa = Array.isArray(state.lumpSums) ? state.lumpSums : [];
+    const incEvents = increases
+      .map(inc => ({offset: monthOffset(startYM, inc.month), amount: inc.amount}))
+      .filter(e => e.offset >= 0 && e.offset < targetMonths)
+      .sort((a,b) => a.offset - b.offset);
+    const lumpByOffset = {};
+    lumpSumsIsa.forEach(l => {
+      const off = monthOffset(startYM, l.month);
+      if(off >= 0 && off < targetMonths){
+        lumpByOffset[off] = (lumpByOffset[off] || 0) + (parseFloat(l.amount) || 0);
+      }
+    });
+    let incPointer = 0;
+    for(let m = 0; m < targetMonths; m++){
+      while(incPointer < incEvents.length && incEvents[incPointer].offset === m){
+        currentMonthly = incEvents[incPointer].amount;
+        incPointer++;
+      }
+      const lump = lumpByOffset[m] || 0;
+      balance = (balance + currentMonthly + lump) * (1 + monthlyRate);
+    }
+    return balance;
+  }
+
+  $('importIsaBtn').addEventListener('click', () => $('importIsaFile').click());
+  $('importIsaFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const rd = retirementDate();
+    if(!rd){
+      alert('Set your date of birth and planned retirement age above first, so this can work out how far ahead to project.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'isa'){
+          alert("That doesn't look like a summary file from the ISA tracker.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it from the ISA tracker first.');
+          return;
+        }
+        const rdYM = rd.getFullYear() + '-' + String(rd.getMonth()+1).padStart(2,'0');
+        const startYM = (parsed.state.startYear || nowDefault.year) + '-' + (parsed.state.startMonth || nowDefault.month);
+        const targetMonths = monthOffset(startYM, rdYM);
+        const projected = projectIsaStateTo(parsed.state, targetMonths);
+        $('isaBalance').value = Math.round(projected);
+        $('isaMonthly').value = 0;
+        isaPreProjected = true;
+        $('isaImportNote').textContent = targetMonths > 0
+          ? `Imported ${gbp(projected)} — the ISA tracker's own balance/contributions/growth rate, run forward to your retirement date (${rd.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}). Edit the balance/monthly fields above to go back to manual projection.`
+          : `Imported ${gbp(projected)} — your retirement date is at or before the ISA tracker's own start date, so no further growth was projected. Edit the balance/monthly fields above to go back to manual projection.`;
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from the ISA tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  // hand-editing the balance/monthly fields means the person wants manual control again
+  ['savingsBalance','savingsMonthly'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      if(savingsPreProjected){ savingsPreProjected = false; $('savingsImportNote').textContent = ''; }
+    });
+  });
+  ['isaBalance','isaMonthly'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      if(isaPreProjected){ isaPreProjected = false; $('isaImportNote').textContent = ''; }
     });
   });
 
   // ---------- wire up inputs ----------
-  [
-    'startMonth','startYear','startingBalance','dob','retireAge',
-    'salary','payRise','employeePct','employerPct',
-    'lowGrowth','medGrowth','highGrowth',
-    'desiredIncome','withdrawalRate','reducedAge','reducedIncome',
-    'dbPension','dbPensionAge','statePensionAge','statePension','planToAge'
-  ].forEach(id => {
+  SIMPLE_FIELD_IDS.forEach(id => {
     $(id).addEventListener('change', compute);
     $(id).addEventListener('input', compute);
   });
 
   // ---------- init ----------
   initCharts();
+  renderAllocTable();
+  populateFundingYearSelect();
+  renderHistoryTable();
+  setNextHistoryDateDefault();
   compute();
 })();
 </script>

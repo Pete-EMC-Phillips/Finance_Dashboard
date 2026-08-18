@@ -243,13 +243,13 @@
       <div class="mini-chart-wrap"><div id="isaMiniEmpty" class="mini-empty">Import your ISA summary to see this chart.</div><canvas id="isaMiniChart"></canvas></div>
     </div>
     <div class="card source-card" style="border-top-color:var(--pension);">
-      <h2><span class="dot" style="background:var(--pension);"></span>Pension</h2>
+      <h2><span class="dot" style="background:var(--pension);"></span>Pension &amp; Retirement</h2>
       <p class="status" id="pensionStatus">No data imported yet.</p>
       <div class="source-actions">
-        <label class="upload-btn">📤 Upload pension-summary.json<input type="file" id="pensionUpload" accept=".json" hidden></label>
-        <a class="open-link" href="pension_tracker.html" target="_blank" rel="noopener">Open pension tracker →</a>
+        <label class="upload-btn">📤 Upload retirement-plan-summary.json<input type="file" id="pensionUpload" accept=".json" hidden></label>
+        <a class="open-link" href="pension_tracker.html" target="_blank" rel="noopener">Open retirement planner →</a>
       </div>
-      <div class="mini-chart-wrap"><div id="pensionMiniEmpty" class="mini-empty">Import your pension summary to see this chart.</div><canvas id="pensionMiniChart"></canvas></div>
+      <div class="mini-chart-wrap"><div id="pensionMiniEmpty" class="mini-empty">Import your retirement plan summary to see this chart.</div><canvas id="pensionMiniChart"></canvas></div>
     </div>
     <div class="card source-card" style="border-top-color:var(--savings);">
       <h2><span class="dot" style="background:var(--savings);"></span>Savings</h2>
@@ -293,9 +293,23 @@
 
   <div class="card chart-card">
     <h2><span class="dot" style="background:var(--pension);"></span>Net worth over time <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(until retirement)</span></h2>
-    <div id="timelineEmpty" class="mini-empty" style="display:none;">Import your pension summary to see this chart — it defines the retirement horizon. ISA and house equity are added in on top of it.</div>
+    <div id="timelineEmpty" class="mini-empty" style="display:none;">Import your retirement plan summary to see this chart — it defines the retirement horizon. ISA and house equity are added in on top of it.</div>
     <canvas id="netWorthTimelineChart"></canvas>
     <p style="color:var(--muted);font-size:0.78rem;text-align:center;margin:10px 0 0;">Combines ISA balance, pension pot (medium growth) and house equity year by year. ISA and mortgage figures hold flat once their own projection ends. Assumes all trackers were last updated around the same time.</p>
+  </div>
+
+  <div class="card chart-card">
+    <h2><span class="dot" style="background:var(--pension);"></span>Where the money comes from each year <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario, in retirement)</span></h2>
+    <div id="incomeSourceEmpty" class="mini-empty">Import your retirement plan summary to see this chart.</div>
+    <canvas id="incomeSourceChart" style="display:none;"></canvas>
+    <p style="color:var(--muted);font-size:0.78rem;text-align:center;margin:10px 0 0;">From the retirement planner — DB/State pension, other income, tax-free cash, and pot/savings/ISA drawdown, year by year against your required income (dashed line).</p>
+  </div>
+
+  <div class="card chart-card">
+    <h2><span class="dot" style="background:var(--pension);"></span>Wealth mix in retirement <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(medium scenario)</span></h2>
+    <div id="wealthMixEmpty" class="mini-empty">Import your retirement plan summary to see this chart.</div>
+    <canvas id="wealthMixChart" style="display:none;"></canvas>
+    <p style="color:var(--muted);font-size:0.78rem;text-align:center;margin:10px 0 0;">From the retirement planner — pension pot, savings and ISA balances as they're drawn down through retirement.</p>
   </div>
 
   <div class="card">
@@ -360,7 +374,7 @@
   }
 
   // ---------- charts ----------
-  let netWorthChart, netWorthTimelineChart, isaMiniChart, pensionMiniChart, mortgageMiniChart, budgetMiniChart, creditcardMiniChart, savingsMiniChart;
+  let netWorthChart, netWorthTimelineChart, isaMiniChart, pensionMiniChart, mortgageMiniChart, budgetMiniChart, creditcardMiniChart, savingsMiniChart, incomeSourceChart, wealthMixChart;
   const gridColor = 'rgba(255,255,255,0.06)';
   Chart.defaults.color = '#96a2b8';
   Chart.defaults.font.family = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif";
@@ -409,6 +423,66 @@
         scales:{
           x:{grid:{color:gridColor}, ticks:{maxRotation:60, minRotation:0, autoSkip:true, maxTicksLimit:20}},
           y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}}
+        }
+      }
+    });
+
+    const isctx = $('incomeSourceChart').getContext('2d');
+    incomeSourceChart = new Chart(isctx, {
+      type:'bar',
+      data:{
+        labels:[],
+        datasets:[
+          {type:'bar', label:'DB pension(s)', data:[], backgroundColor:'#7c8cff', stack:'income'},
+          {type:'bar', label:'State pension', data:[], backgroundColor:'#2fd6a7', stack:'income'},
+          {type:'bar', label:'Other income', data:[], backgroundColor:'#4fc3f7', stack:'income'},
+          {type:'bar', label:'Tax-free cash spend', data:[], backgroundColor:'#c792ea', stack:'income'},
+          {type:'bar', label:'Pension pot spend', data:[], backgroundColor:'#f2b84b', stack:'income'},
+          {type:'bar', label:'Savings spend', data:[], backgroundColor:'#ff8fa3', stack:'income'},
+          {type:'bar', label:'ISA spend', data:[], backgroundColor:'#00c2a8', stack:'income'},
+          {type:'line', label:'Required income', data:[], borderColor:'#eaeef4', backgroundColor:'transparent', borderWidth:2, borderDash:[6,4], pointRadius:0, stepped:true, fill:false}
+        ]
+      },
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{
+            callbacks:{
+              title:ctx => 'Age ' + ctx[0].label,
+              label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)
+            }
+          }
+        },
+        scales:{
+          x:{stacked:true, grid:{display:false}, title:{display:true, text:'Age', color:'#96a2b8'}, ticks:{maxTicksLimit:15}},
+          y:{stacked:true, grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}}
+        }
+      }
+    });
+
+    const wmctx = $('wealthMixChart').getContext('2d');
+    wealthMixChart = new Chart(wmctx, {
+      type:'line',
+      data:{labels:[], datasets:[
+        {label:'Pension pot', data:[], borderColor:'#f2b84b', backgroundColor:'rgba(242,184,75,0.12)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5},
+        {label:'Savings', data:[], borderColor:'#a3e635', backgroundColor:'rgba(163,230,53,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5},
+        {label:'ISA', data:[], borderColor:'#2fd6a7', backgroundColor:'rgba(47,214,167,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5}
+      ]},
+      options:{
+        responsive:true,
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{callbacks:{
+            title:ctx => 'Age ' + ctx[0].label,
+            label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)
+          }}
+        },
+        scales:{
+          x:{grid:{color:gridColor}, title:{display:true, text:'Age', color:'#96a2b8'}},
+          y:{grid:{color:gridColor}, ticks:{callback:v => '£' + (v/1000) + 'k'}, beginAtZero:true}
         }
       }
     });
@@ -600,7 +674,7 @@
     });
   }
   wireUpload('isaUpload', 'isa', 'isa');
-  wireUpload('pensionUpload', 'pension', 'pension');
+  wireUpload('pensionUpload', 'retirement-planner', 'pension');
   wireUpload('mortgageUpload', 'mortgage', 'mortgage');
   wireUpload('budgetUpload', 'budget', 'budget');
   wireUpload('creditcardUpload', 'creditcard', 'creditcard');
@@ -638,7 +712,10 @@
 
     // net worth now / projected
     const isaNow = isa ? isa.startingBalance : 0;
-    const pensionNow = pension ? pension.startingBalance : 0;
+    // pension "now" = live scheme balance + dormant pots (at their own last valuation) — the
+    // retirement planner doesn't track a single combined "today" figure since dormant pots each
+    // have their own valuation date, so this is the closest available approximation
+    const pensionNow = pension ? (pension.startingBalance || 0) + (pension.dormantSchemes ? (pension.dormantSchemes.startingSum || 0) : 0) : 0;
     const mortgageNow = mortgage ? mortgage.mortgageBalance : 0;
     const houseNow = mortgage ? (mortgage.houseValue || 0) : 0;
     const creditcardNow = creditcard ? (creditcard.totalNow || 0) : 0;
@@ -646,7 +723,8 @@
     const netWorthNow = isaNow + pensionNow + houseNow + savingsNow - mortgageNow - creditcardNow;
 
     const isaFuture = isa ? isa.finalBalance : 0;
-    const pensionFuture = pension ? pension.potMedium : 0;
+    // pensionTotal.medium already includes dormant pots' projected value at retirement
+    const pensionFuture = pension && pension.pensionTotal ? pension.pensionTotal.medium : 0;
     const mortgageFuture = 0; // assumes mortgage eventually reaches zero
     const houseFuture = houseNow; // no appreciation modelled — house value assumed constant
     const creditcardFuture = creditcardNow; // no paydown modelled — held flat at the latest recorded balance
@@ -782,6 +860,41 @@
       $('netWorthTimelineChart').style.display = 'none';
     }
 
+    // ---- where the money comes from each year (from the retirement planner) ----
+    const iss = pension && pension.incomeSourceSeries;
+    if(iss && iss.ages && iss.ages.length){
+      incomeSourceChart.data.labels = iss.ages.map(String);
+      incomeSourceChart.data.datasets[0].data = iss.dbIncomes || [];
+      incomeSourceChart.data.datasets[1].data = iss.spIncomes || [];
+      incomeSourceChart.data.datasets[2].data = iss.otherIncomes || [];
+      incomeSourceChart.data.datasets[3].data = iss.taxFreeSpends || [];
+      incomeSourceChart.data.datasets[4].data = iss.potSpends || [];
+      incomeSourceChart.data.datasets[5].data = iss.savSpends || [];
+      incomeSourceChart.data.datasets[6].data = iss.isaSpends || [];
+      incomeSourceChart.data.datasets[7].data = iss.targets || [];
+      incomeSourceChart.update();
+    } else {
+      incomeSourceChart.data.labels = [];
+      incomeSourceChart.data.datasets.forEach(d => d.data = []);
+      incomeSourceChart.update();
+    }
+    toggleMiniEmpty('incomeSourceChart', !iss || !iss.ages || !iss.ages.length);
+
+    // ---- wealth mix in retirement (from the retirement planner) ----
+    const wms = pension && pension.wealthMixSeries;
+    if(wms && wms.ages && wms.ages.length){
+      wealthMixChart.data.labels = wms.ages.map(String);
+      wealthMixChart.data.datasets[0].data = wms.potBalances || [];
+      wealthMixChart.data.datasets[1].data = wms.savBalances || [];
+      wealthMixChart.data.datasets[2].data = wms.isaBalances || [];
+      wealthMixChart.update();
+    } else {
+      wealthMixChart.data.labels = [];
+      wealthMixChart.data.datasets.forEach(d => d.data = []);
+      wealthMixChart.update();
+    }
+    toggleMiniEmpty('wealthMixChart', !wms || !wms.ages || !wms.ages.length);
+
     // warnings panel
     const warnings = [];
     if(isa && isa.allowanceWarning){
@@ -790,8 +903,8 @@
     if(pension && pension.annualAllowanceWarning){
       warnings.push('⚠ Pension: combined contributions in a 12-month period may exceed the £60,000 annual allowance.');
     }
-    if(pension && pension.medianPotDepletesInRetirement){
-      warnings.push('⚠ Pension: at medium growth, your pot is projected to run out before your "plan to" age.');
+    if(pension && pension.medianDepletesInRetirement){
+      warnings.push('⚠ Retirement: at medium growth, your pot + savings are projected to run out before your "plan to" age.');
     }
     if(mortgage && mortgage.stalledWarning){
       warnings.push("⚠ Mortgage: the actual payment entered doesn't cover the interest due.");
