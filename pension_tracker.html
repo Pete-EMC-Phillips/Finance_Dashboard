@@ -407,7 +407,7 @@
     gap:10px;flex-wrap:wrap;
     color:var(--muted);
     font-size:0.78rem;
-    margin-top:20px;
+    margin-bottom:18px;
   }
   .save-note button, .save-note .file-btn{
     background:none;
@@ -420,6 +420,17 @@
     display:inline-block;
   }
   .save-note button:hover, .save-note .file-btn:hover{color:var(--danger);border-color:var(--danger);}
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--muted);
+    text-decoration:none;
+    font-size:0.85rem;
+    margin-bottom:14px;
+    padding:6px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+  .back-link:hover{color:var(--accent);border-color:var(--accent);}
   footer{
     text-align:center;color:var(--muted);
     font-size:0.78rem;margin-top:20px;
@@ -429,6 +440,7 @@
 <body>
 <div class="wrap">
   <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
     <div class="brand-logo" style="margin-bottom:14px;">
       <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
         <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
@@ -443,6 +455,15 @@
     <h1>🏛️ Retirement Planner</h1>
     <p>Project your whole retirement picture — live DC pension, dormant pots, DB pensions, savings &amp; ISAs and the State Pension — from today through to the income you'll draw in retirement.</p>
   </header>
+
+  <div class="save-note">
+    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
+      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+      <button id="exportData" type="button">⬇ Export summary</button>
+      <button id="clearSaved" type="button">Reset to defaults</button>
+    </span>
+  </div>
 
   <h2 class="section-title">🏦 Building your pension</h2>
 
@@ -946,15 +967,6 @@
     <h2><span class="dot" style="background:var(--accent-2)"></span>Cash journey at retirement <span style="color:var(--muted);font-weight:400;font-size:0.75rem;">(pension + savings/ISA combined)</span></h2>
     <canvas id="journeyChart"></canvas>
     <p class="chart-note" id="journeyNote"></p>
-  </div>
-
-  <div class="save-note">
-    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
-    <span style="display:flex;gap:8px;flex-wrap:wrap;">
-      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
-      <button id="exportData" type="button">⬇ Export summary</button>
-      <button id="clearSaved" type="button">Reset to defaults</button>
-    </span>
   </div>
 
   <footer>Illustrative only — not financial advice. Assumes constant monthly compounding, a flat salary that only changes when you add a scheduled pay rise, and steady contribution rates between scheduled changes. Dormant DC pots compound from their valuation date at the same low/medium/high rates as your live scheme, with no further contributions. The tax-free lump sum option assumes you take it as a single withdrawal at retirement, capped by the UK Lump Sum Allowance (£268,275 for 2026/27) less any tax-free cash you record as already taken from DB schemes — it does not check scheme-specific commutation limits, doesn't model the Money Purchase Annual Allowance (MPAA) that taking taxable pension income can trigger, and ignores the separate £1,073,100 Lump Sum and Death Benefit Allowance. Savings and ISA are modelled as two separate pots, each growing at the same three rates. In retirement, each year's income shortfall (beyond DB/State pension, other income, and any funding-plan tax-free spend) is split between your pension pot, savings, ISA and unallocated tax-free lump sum according to the % you set for that year in the Drawdown allocation table — a bucket set to 0% for a year is never drawn on that year even if the others run out, in which case the shortfall counts towards that scenario "running out"; this table applies to all three growth scenarios, though low/high only have a lump sum to draw on if you've taken one (they don't use the funding plan). DB pensions and the State Pension are summed and assumed flat in cash terms. The UK pension Annual Allowance is currently £60,000/tax year (2026/27) across all your pensions combined; this tool checks your live scheme's rolling 12-month employee + employer contributions against it as a rough guide only — it does not account for the tapered allowance, MPAA, or carry forward, and doesn't include savings/ISA contributions since those aren't pension contributions. If you've added rows to the retirement funding plan, they apply on top of the drawdown allocation table for the medium scenario only, in year order starting from your retirement date; any tax-free cash left unallocated (or leftover once your rows run out) earns 0% while unspent and is only drawn down via the "Lump sum %" column — it's never auto-swept elsewhere. The cash journey chart assumes withdrawals are taken at the start of each year, remaining balances keep growing at their scenario's rate, and State/DB/other income only counts from the ages you set. Your "reduce income" steps apply in order of age, each overriding the last once reached. It all ignores tax on income drawn (beyond the tax-free lump sum), ISA tax-free status aside, inflation, and State Pension age changes.</footer>

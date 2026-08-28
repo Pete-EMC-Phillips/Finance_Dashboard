@@ -223,7 +223,7 @@
     gap:10px;flex-wrap:wrap;
     color:var(--muted);
     font-size:0.78rem;
-    margin-top:20px;
+    margin-bottom:18px;
   }
   .save-note button, .save-note .file-btn{
     background:none;
@@ -236,6 +236,17 @@
     display:inline-block;
   }
   .save-note button:hover, .save-note .file-btn:hover{color:var(--danger);border-color:var(--danger);}
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--muted);
+    text-decoration:none;
+    font-size:0.85rem;
+    margin-bottom:14px;
+    padding:6px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+  .back-link:hover{color:var(--accent);border-color:var(--accent);}
   footer{
     text-align:center;color:var(--muted);
     font-size:0.78rem;margin-top:20px;
@@ -245,6 +256,7 @@
 <body>
 <div class="wrap">
   <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
     <div class="brand-logo" style="margin-bottom:14px;">
       <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
         <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
@@ -259,6 +271,15 @@
     <h1>🌱 S&amp;S ISA Growth Tracker <span class="badge">10-year projection</span></h1>
     <p>Model how your Stocks &amp; Shares ISA could grow with regular contributions, one-off lump sums, and future top-ups.</p>
   </header>
+
+  <div class="save-note">
+    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
+      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+      <button id="exportData" type="button">⬇ Export summary</button>
+      <button id="clearSaved" type="button">Reset to defaults</button>
+    </span>
+  </div>
 
   <div class="layout">
     <!-- CONTROLS -->
@@ -316,6 +337,26 @@
       </div>
 
       <div class="card">
+        <h2><span class="dot" style="background:var(--danger)"></span>One-off withdrawals</h2>
+        <div id="withdrawList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>Month</label>
+            <select id="withdrawMonth"></select>
+          </div>
+          <div>
+            <label>Year</label>
+            <input type="number" id="withdrawYear" min="2000" max="2100" step="1">
+          </div>
+          <div>
+            <label>Amount (£)</label>
+            <input type="number" id="withdrawAmount" placeholder="e.g. 500" min="1" step="10">
+          </div>
+          <button class="add-btn" id="addWithdraw" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2><span class="dot" style="background:var(--accent-2)"></span>Future monthly top-ups</h2>
         <div id="increaseList" class="sublist"></div>
         <div class="add-form">
@@ -335,14 +376,27 @@
         </div>
       </div>
 
-      <div class="save-note">
-        <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
-        <span style="display:flex;gap:8px;flex-wrap:wrap;">
-          <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
-          <button id="exportData" type="button">⬇ Export summary</button>
-          <button id="clearSaved" type="button">Reset to defaults</button>
-        </span>
+      <div class="card">
+        <h2><span class="dot" style="background:var(--warn)"></span>Actual monthly balance</h2>
+        <p style="color:var(--muted);font-size:0.8rem;margin:-6px 0 12px;">Log your real ISA statement balance each month to compare against the projection. Assumes that month's contribution landed on the 1st.</p>
+        <div id="actualList" class="sublist"></div>
+        <div class="add-form">
+          <div>
+            <label>Month</label>
+            <select id="actMonth"></select>
+          </div>
+          <div>
+            <label>Year</label>
+            <input type="number" id="actYear" min="2000" max="2100" step="1">
+          </div>
+          <div>
+            <label>Balance (£)</label>
+            <input type="number" id="actBalance" placeholder="e.g. 5200" min="0" step="10">
+          </div>
+          <button class="add-btn" id="addActual" type="button">Add</button>
+        </div>
       </div>
+
     </div>
 
     <!-- RESULTS -->
@@ -355,7 +409,7 @@
           <div class="value" id="statFinal">£0</div>
         </div>
         <div class="stat neu">
-          <div class="label">Total paid in</div>
+          <div class="label">Net contributions</div>
           <div class="value" id="statContrib">£0</div>
         </div>
         <div class="stat pos">
@@ -412,7 +466,9 @@
       years: $('years').value,
       growth: $('growth').value,
       lumpSums: lumpSums,
-      increases: increases
+      increases: increases,
+      withdrawals: withdrawals,
+      actuals: actuals
     };
   }
 
@@ -436,7 +492,14 @@
   // ---------- state ----------
   let lumpSums = [];     // { month: 'YYYY-MM', amount: number }
   let increases = [];    // { month: 'YYYY-MM', amount: number }
+  let withdrawals = [];  // { month: 'YYYY-MM', amount: number }
+  let actuals = [];      // { month: 'YYYY-MM', balance: number } — real statement balances
   let lastResults = {};  // populated at the end of compute(), read by the export button
+
+  // set at the end of each compute() run so renderActualList() can work out implied growth
+  let lastMonthlyContribAmounts = null;
+  let lastStartYM = null;
+  let lastStartingBalance = 0;
 
   function downloadJSON(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
@@ -459,7 +522,7 @@
       `<option value="${String(i+1).padStart(2,'0')}">${name}</option>`
     ).join('');
   }
-  ['startMonth','lumpMonth','incMonth'].forEach(id => populateMonthSelect($(id)));
+  ['startMonth','lumpMonth','incMonth','withdrawMonth','actMonth'].forEach(id => populateMonthSelect($(id)));
 
   function defaultStartMonth(){
     const d = new Date();
@@ -478,8 +541,12 @@
     $('growth').value = state.growth != null ? state.growth : 6;
     lumpSums = Array.isArray(state.lumpSums) ? state.lumpSums : [];
     increases = Array.isArray(state.increases) ? state.increases : [];
+    withdrawals = Array.isArray(state.withdrawals) ? state.withdrawals : [];
+    actuals = Array.isArray(state.actuals) ? state.actuals : [];
     renderLumpList();
     renderIncreaseList();
+    renderWithdrawList();
+    renderActualList();
   }
 
   // apply saved state (if any) before first compute
@@ -490,6 +557,10 @@
   $('lumpYear').value = nowDefault.year;
   $('incMonth').value = nowDefault.month;
   $('incYear').value = nowDefault.year;
+  $('withdrawMonth').value = nowDefault.month;
+  $('withdrawYear').value = nowDefault.year;
+  $('actMonth').value = nowDefault.month;
+  $('actYear').value = nowDefault.year;
 
   function readYM(monthSelId, yearInputId){
     const month = $(monthSelId).value;
@@ -538,7 +609,7 @@
           borderWidth:2.5
         },
         {
-          label:'Total paid in',
+          label:'Net contributions',
           data:[],
           borderColor:'#4aa8ff',
           backgroundColor:'rgba(74,168,255,0.08)',
@@ -547,6 +618,19 @@
           pointRadius:0,
           borderWidth:2,
           borderDash:[5,4]
+        },
+        {
+          label:'Actual balance',
+          data:[],
+          borderColor:'#ffb454',
+          backgroundColor:'#ffb454',
+          showLine:false,
+          pointRadius:4,
+          pointHoverRadius:6,
+          pointBackgroundColor:'#ffb454',
+          pointBorderColor:'#0f1a17',
+          pointBorderWidth:1.5,
+          spanGaps:false
         }
       ]},
       options:{
@@ -554,7 +638,10 @@
         interaction:{mode:'index', intersect:false},
         plugins:{
           legend:{position:'top', labels:{boxWidth:12, padding:16}},
-          tooltip:{callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}}
+          tooltip:{
+            filter:item => item.parsed.y !== null && item.parsed.y !== undefined,
+            callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}
+          }
         },
         scales:{
           x:{grid:{color:gridColor}, ticks:{maxTicksLimit:10}},
@@ -640,16 +727,91 @@
       }).join('');
   }
 
+  function renderWithdrawList(){
+    const el = $('withdrawList');
+    if(withdrawals.length === 0){
+      el.innerHTML = '<div class="empty-note">No withdrawals added yet.</div>';
+      return;
+    }
+    el.innerHTML = withdrawals
+      .slice()
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map((w) => {
+        const realIdx = withdrawals.indexOf(w);
+        return `<div class="sublist-item">
+          <div class="meta"><b>-${gbp(w.amount)}</b><span>${fmtMonth(w.month)}</span></div>
+          <button class="remove-btn" data-type="withdraw" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  function growthBadge(amt, pct, spanMonths){
+    if(pct === null || pct === undefined || !isFinite(pct)) return '';
+    const sign = amt >= 0 ? '+' : '';
+    const color = amt >= 0 ? 'var(--accent)' : 'var(--danger)';
+    const period = spanMonths > 1 ? ` over ${spanMonths}mo` : '';
+    return ` · <span style="color:${color}">${sign}${gbp(amt)} (${sign}${pct.toFixed(1)}%${period})</span>`;
+  }
+
+  function renderActualList(){
+    const el = $('actualList');
+    if(actuals.length === 0){
+      el.innerHTML = '<div class="empty-note">No actual balances logged yet.</div>';
+      return;
+    }
+    const sorted = actuals.slice().sort((a,b) => a.month.localeCompare(b.month));
+    let prevBalance = null, prevOffset = null;
+    const startYM = lastStartYM;
+    const contribAmounts = lastMonthlyContribAmounts;
+    const rows = sorted.map((a) => {
+      const realIdx = actuals.indexOf(a);
+      let growthHtml = '';
+      if(startYM && contribAmounts){
+        const offset = monthOffset(startYM, a.month);
+        if(prevBalance === null){
+          if(offset >= 0){
+            let sumContrib = 0;
+            for(let j = 0; j <= offset && j < contribAmounts.length; j++) sumContrib += contribAmounts[j];
+            const ref = lastStartingBalance;
+            const growthAmt = a.balance - ref - sumContrib;
+            const growthPct = ref > 0 ? (growthAmt/ref*100) : null;
+            growthHtml = growthBadge(growthAmt, growthPct, offset + 1);
+          }
+        } else if(offset >= 0 && prevOffset != null){
+          let sumContrib = 0;
+          for(let j = prevOffset+1; j <= offset && j < contribAmounts.length; j++) sumContrib += contribAmounts[j];
+          const growthAmt = a.balance - prevBalance - sumContrib;
+          const growthPct = prevBalance > 0 ? (growthAmt/prevBalance*100) : null;
+          growthHtml = growthBadge(growthAmt, growthPct, offset - prevOffset);
+        }
+        prevBalance = a.balance;
+        prevOffset = offset;
+      }
+      return `<div class="sublist-item">
+        <div class="meta"><b>${gbp(a.balance)}</b><span>${fmtMonth(a.month)}${growthHtml}</span></div>
+        <button class="remove-btn" data-type="actual" data-idx="${realIdx}">✕</button>
+      </div>`;
+    });
+    el.innerHTML = rows.join('');
+  }
+
   document.body.addEventListener('click', e => {
     const btn = e.target.closest('.remove-btn');
     if(!btn) return;
     const idx = Number(btn.dataset.idx);
-    if(btn.dataset.type === 'lump'){
+    const type = btn.dataset.type;
+    if(type === 'lump'){
       lumpSums.splice(idx,1);
       renderLumpList();
-    } else {
+    } else if(type === 'inc'){
       increases.splice(idx,1);
       renderIncreaseList();
+    } else if(type === 'withdraw'){
+      withdrawals.splice(idx,1);
+      renderWithdrawList();
+    } else if(type === 'actual'){
+      actuals.splice(idx,1);
+      renderActualList();
     }
     compute();
   });
@@ -671,6 +833,30 @@
     increases.push({month, amount});
     $('incAmount').value = '';
     renderIncreaseList();
+    compute();
+  });
+
+  $('addWithdraw').addEventListener('click', () => {
+    const month = readYM('withdrawMonth','withdrawYear');
+    const amount = parseFloat($('withdrawAmount').value);
+    if(!month || !amount || amount <= 0){ return; }
+    withdrawals.push({month, amount});
+    $('withdrawAmount').value = '';
+    renderWithdrawList();
+    compute();
+  });
+
+  $('addActual').addEventListener('click', () => {
+    const month = readYM('actMonth','actYear');
+    const balance = parseFloat($('actBalance').value);
+    if(!month || isNaN(balance) || balance < 0){ return; }
+    const existingIdx = actuals.findIndex(a => a.month === month);
+    if(existingIdx >= 0){
+      actuals[existingIdx].balance = balance;
+    } else {
+      actuals.push({month, balance});
+    }
+    $('actBalance').value = '';
     compute();
   });
 
@@ -729,6 +915,21 @@
       const off = monthOffset(startYM, l.month);
       if(off >= 0 && off < totalMonths){
         lumpByOffset[off] = (lumpByOffset[off] || 0) + l.amount;
+      }
+    });
+    withdrawals.forEach(w => {
+      const off = monthOffset(startYM, w.month);
+      if(off >= 0 && off < totalMonths){
+        lumpByOffset[off] = (lumpByOffset[off] || 0) - w.amount;
+      }
+    });
+
+    // actual logged balances, mapped onto the same month-offset grid as the projection
+    const actualSeries = new Array(totalMonths).fill(null);
+    actuals.forEach(a => {
+      const off = monthOffset(startYM, a.month);
+      if(off >= 0 && off < totalMonths){
+        actualSeries[off] = a.balance;
       }
     });
 
@@ -798,6 +999,7 @@
     growthChart.data.labels = displayLabels;
     growthChart.data.datasets[0].data = balanceSeries;
     growthChart.data.datasets[1].data = contribSeries;
+    growthChart.data.datasets[2].data = actualSeries;
     growthChart.update();
 
     barChart.data.labels = yearLabels;
@@ -828,9 +1030,15 @@
       allowanceWarning: maxRolling > 20000,
       series: {
         balanceSeries,
-        contribSeries
+        contribSeries,
+        actualSeries
       }
     };
+
+    lastMonthlyContribAmounts = monthlyContribAmounts;
+    lastStartYM = startYM;
+    lastStartingBalance = startingBalance;
+    renderActualList();
 
     saveNow();
   }

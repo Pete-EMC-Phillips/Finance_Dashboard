@@ -175,7 +175,7 @@
     gap:10px;flex-wrap:wrap;
     color:var(--muted);
     font-size:0.78rem;
-    margin-top:20px;
+    margin-bottom:18px;
   }
   .save-note button, .save-note .file-btn{
     background:none;
@@ -188,6 +188,17 @@
     display:inline-block;
   }
   .save-note button:hover, .save-note .file-btn:hover{color:var(--deficit);border-color:var(--deficit);}
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--muted);
+    text-decoration:none;
+    font-size:0.85rem;
+    margin-bottom:14px;
+    padding:6px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+  }
+  .back-link:hover{color:var(--accent);border-color:var(--accent);}
   footer{
     text-align:center;color:var(--muted);
     font-size:0.78rem;margin-top:20px;
@@ -197,6 +208,7 @@
 <body>
 <div class="wrap">
   <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
     <div class="brand-logo" style="margin-bottom:14px;">
       <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
         <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
@@ -211,6 +223,15 @@
     <h1>🧾 Monthly Budget Tracker</h1>
     <p>Net take-home income, direct debits, and what's already committed to your ISA and mortgage each month.</p>
   </header>
+
+  <div class="save-note">
+    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
+      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+      <button id="exportData" type="button">⬇ Export summary</button>
+      <button id="clearSaved" type="button">Reset to defaults</button>
+    </span>
+  </div>
 
   <div class="layout">
     <!-- CONTROLS -->
@@ -263,14 +284,6 @@
         <p class="hint" style="margin-top:6px;margin-bottom:0;">Matches your mortgage tracker's standard payment (plus any overpayment) — same story, manual for now.</p>
       </div>
 
-      <div class="save-note">
-        <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
-        <span style="display:flex;gap:8px;">
-          <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
-          <button id="exportData" type="button">⬇ Export summary</button>
-          <button id="clearSaved" type="button">Reset to defaults</button>
-        </span>
-      </div>
     </div>
 
     <!-- RESULTS -->
