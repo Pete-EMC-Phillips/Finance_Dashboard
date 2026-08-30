@@ -268,16 +268,14 @@
           <input type="number" id="houseValue" value="280000" min="0" step="1000">
         </div>
         <p class="hint" style="margin-top:-6px;">Used for the net worth figures on the dashboard (house value minus what's left on the mortgage) — assumed constant, no appreciation modelled.</p>
-        <div class="row2">
-          <div class="field">
-            <label for="termYears">Remaining term — years</label>
-            <input type="number" id="termYears" value="22" min="0" max="40" step="1">
-          </div>
-          <div class="field">
-            <label for="termMonths">Remaining term — months</label>
-            <input type="number" id="termMonths" value="0" min="0" max="11" step="1">
+        <div class="field">
+          <label>Mortgage finish date</label>
+          <div class="month-year">
+            <select id="finishMonth"></select>
+            <input type="number" id="finishYear" min="2000" max="2100" step="1">
           </div>
         </div>
+        <p class="hint" style="margin-top:-6px;">Remaining term is worked out automatically from this date and "figures as of" above — check your mortgage statement or offer letter for the exact payoff date. Currently: <strong id="termRemainingDisplay">—</strong> remaining.</p>
         <div class="field">
           <label for="rate">Interest rate</label>
           <div class="slider-row">
@@ -386,8 +384,8 @@
       mortgageBalance: $('mortgageBalance').value,
       offsetBalance: $('offsetBalance').value,
       houseValue: $('houseValue').value,
-      termYears: $('termYears').value,
-      termMonths: $('termMonths').value,
+      finishMonth: $('finishMonth').value,
+      finishYear: $('finishYear').value,
       rate: $('rate').value,
       overpayment: $('overpayment').value,
       actualPayment: $('actualPayment').value
@@ -416,6 +414,7 @@
     ).join('');
   }
   populateMonthSelect($('startMonth'));
+  populateMonthSelect($('finishMonth'));
 
   function defaultStartMonth(){
     const d = new Date();
@@ -430,8 +429,28 @@
     $('mortgageBalance').value = (saved && saved.mortgageBalance) != null ? saved.mortgageBalance : 200000;
     $('offsetBalance').value = (saved && saved.offsetBalance) != null ? saved.offsetBalance : 20000;
     $('houseValue').value = (saved && saved.houseValue) != null ? saved.houseValue : 280000;
-    $('termYears').value = (saved && saved.termYears) != null ? saved.termYears : 22;
-    $('termMonths').value = (saved && saved.termMonths) != null ? saved.termMonths : 0;
+
+    if(saved && saved.finishMonth && saved.finishYear){
+      // current-shape state: finish date is stored directly
+      $('finishMonth').value = saved.finishMonth;
+      $('finishYear').value = saved.finishYear;
+    } else if(saved && (saved.termYears != null || saved.termMonths != null)){
+      // migrating an older save/import that stored a manual remaining-term instead —
+      // derive an equivalent finish date from that term + the figures-as-of date so
+      // nothing is lost, then finish date takes over from here on
+      const sy = parseInt(($('startYear').value) || nowDefault.year, 10);
+      const sm = parseInt(($('startMonth').value) || nowDefault.month, 10);
+      const totalM = (parseInt(saved.termYears, 10) || 0) * 12 + (parseInt(saved.termMonths, 10) || 0);
+      const d = new Date(sy, sm - 1 + totalM, 1);
+      $('finishMonth').value = String(d.getMonth() + 1).padStart(2, '0');
+      $('finishYear').value = d.getFullYear();
+    } else {
+      // fresh default: 22 years from today, matching the old default term
+      const d = new Date(nowDefault.year, parseInt(nowDefault.month, 10) - 1 + 22 * 12, 1);
+      $('finishMonth').value = String(d.getMonth() + 1).padStart(2, '0');
+      $('finishYear').value = d.getFullYear();
+    }
+
     $('rate').value = (saved && saved.rate) != null ? saved.rate : 4.24;
     $('overpayment').value = (saved && saved.overpayment) != null ? saved.overpayment : 0;
     $('actualPayment').value = (saved && saved.actualPayment) != null ? saved.actualPayment : 1166;
@@ -502,6 +521,17 @@
     });
   }
 
+  // remaining term (in months), worked out from "figures as of" -> "mortgage finish date"
+  function getTermMonths(){
+    const sy = parseInt($('startYear').value, 10) || nowDefault.year;
+    const sm = parseInt($('startMonth').value || nowDefault.month, 10);
+    const fy = parseInt($('finishYear').value, 10) || sy;
+    const fm = parseInt($('finishMonth').value || $('startMonth').value, 10);
+    const startTotal = sy * 12 + (sm - 1);
+    const finishTotal = fy * 12 + (fm - 1);
+    return Math.max(1, finishTotal - startTotal);
+  }
+
   // ---------- mortgage math ----------
   function calcPayment(balance, monthlyRate, n){
     if(n <= 0) return balance;
@@ -557,15 +587,16 @@
     };
     const mortgageBalance = parseFloat($('mortgageBalance').value) || 0;
     const offsetBalance = parseFloat($('offsetBalance').value) || 0;
-    const termYears = parseInt($('termYears').value, 10) || 0;
-    const termMonths = parseInt($('termMonths').value, 10) || 0;
     const ratePct = parseFloat($('rate').value) || 0;
     const overpayment = parseFloat($('overpayment').value) || 0;
     const actualPayment = parseFloat($('actualPayment').value) || 0;
 
     $('rateVal').textContent = ratePct.toFixed(2) + '%';
 
-    const n = Math.max(1, termYears * 12 + termMonths);
+    const n = getTermMonths();
+    const termYears = Math.floor(n / 12);
+    const termMonths = n % 12;
+    $('termRemainingDisplay').textContent = fmtYM(n);
     const monthlyRate = ratePct / 100 / 12;
     const payment = calcPayment(mortgageBalance, monthlyRate, n);
 
@@ -630,6 +661,9 @@
       mortgageBalance,
       offsetBalance,
       houseValue: parseFloat($('houseValue').value) || 0,
+      finishMonth: $('finishMonth').value,
+      finishYear: $('finishYear').value,
+      termRemainingMonths: n,
       ratePct,
       calculatedPayment: payment,
       actualPayment,
@@ -659,14 +693,14 @@
     });
   });
 
-  ['startMonth','startYear','mortgageBalance','offsetBalance','houseValue','termYears','termMonths','rate','overpayment','actualPayment'].forEach(id => {
+  ['startMonth','startYear','mortgageBalance','offsetBalance','houseValue','finishMonth','finishYear','rate','overpayment','actualPayment'].forEach(id => {
     $(id).addEventListener('change', compute);
     $(id).addEventListener('input', compute);
   });
 
   $('syncActual').addEventListener('click', () => {
     const balance = parseFloat($('mortgageBalance').value) || 0;
-    const n = Math.max(1, (parseInt($('termYears').value,10)||0) * 12 + (parseInt($('termMonths').value,10)||0));
+    const n = getTermMonths();
     const monthlyRate = (parseFloat($('rate').value) || 0) / 100 / 12;
     $('actualPayment').value = Math.round(calcPayment(balance, monthlyRate, n));
     compute();

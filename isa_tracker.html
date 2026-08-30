@@ -1019,6 +1019,9 @@
     $('statGrowth').textContent = gbp(finalGrowth);
     $('statMonthly').textContent = gbp(currentMonthly) + '/mo';
 
+    const sortedActuals = actuals.slice().sort((a,b) => a.month.localeCompare(b.month));
+    const latestActual = sortedActuals.length ? sortedActuals[sortedActuals.length-1] : null;
+
     lastResults = {
       startingBalance,
       monthlyContribution: currentMonthly,
@@ -1028,6 +1031,7 @@
       totalContributed: finalContrib,
       totalGrowth: finalGrowth,
       allowanceWarning: maxRolling > 20000,
+      latestActual, // { month:'YYYY-MM', balance } of the most recently logged real balance, or null
       series: {
         balanceSeries,
         contribSeries,
