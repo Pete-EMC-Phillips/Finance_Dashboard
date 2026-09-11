@@ -83,7 +83,7 @@
     margin-bottom:6px;
   }
   .field{margin-bottom:16px;}
-  input[type="number"], input[type="month"], input[type="text"]{
+  input[type="number"], input[type="month"], input[type="text"], input[type="date"]{
     width:100%;
     background:var(--panel-2);
     border:1px solid var(--border);
@@ -92,8 +92,9 @@
     border-radius:9px;
     font-size:0.95rem;
     outline:none;
+    color-scheme:dark;
   }
-  input[type="number"]:focus, input[type="month"]:focus{
+  input[type="number"]:focus, input[type="month"]:focus, input[type="date"]:focus{
     border-color:var(--accent);
   }
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -181,6 +182,26 @@
   }
   button.add-btn:hover{filter:brightness(1.08);}
   .empty-note{color:var(--muted);font-size:0.82rem;font-style:italic;}
+  textarea{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.9rem;
+    font-family:inherit;
+    outline:none;
+    resize:vertical;
+  }
+  textarea:focus{border-color:var(--accent);}
+  .hint{color:var(--muted);font-size:0.82rem;line-height:1.5;margin:0 0 14px;}
+  .holding-row{
+    display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px;
+    align-items:end;margin-bottom:10px;
+  }
+  .holding-row .name{font-size:0.85rem;font-weight:600;padding-bottom:9px;color:var(--text);}
+  .holding-row .fresh-tag{color:var(--accent);font-weight:400;font-size:0.75rem;}
   .summary-grid{
     display:grid;
     grid-template-columns:repeat(4,1fr);
@@ -440,6 +461,53 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2><span class="dot" style="background:var(--warn)"></span>Portfolio ledger — holdings</h2>
+    <p class="hint">Track your ISA as individual funds instead of one number. Saving a snapshot below feeds straight into "Actual monthly balance" and the growth chart above — no need to enter both.</p>
+    <div id="holdingsEmpty" class="empty-note">No holdings yet — add your funds below.</div>
+    <div id="holdingsList" class="sublist"></div>
+    <div class="add-form" style="grid-template-columns:1.3fr 1fr auto;">
+      <div>
+        <label>Fund name</label>
+        <input type="text" id="newFundName" placeholder="e.g. Vanguard FTSE Global All Cap Idx">
+      </div>
+      <div>
+        <label>Ticker / ISIN (optional)</label>
+        <input type="text" id="newFundTicker" placeholder="e.g. GB00BD3RZ475">
+      </div>
+      <button class="add-btn" id="addHolding" type="button">Add</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--warn)"></span>Refresh prices</h2>
+    <p class="hint">This ledger can't reach live market data on its own — but you can get fresh prices in two steps: copy the request below into a chat with Claude, then paste the reply back here. Prices fill in automatically; you only need to confirm units for each fund.</p>
+    <button class="add-btn" id="copyPriceRequest" type="button" style="margin-bottom:14px;">Copy price-check request</button>
+    <div class="field">
+      <label for="pastePrices">Paste Claude's reply here</label>
+      <textarea id="pastePrices" rows="4" placeholder="e.g.&#10;GB00BD3RZ475: £254.10&#10;IE00B810Q511: £47.02"></textarea>
+    </div>
+    <button class="add-btn" id="applyPastedPrices" type="button">Apply prices</button>
+    <div id="applyPricesResult" class="hint" style="display:none;margin:10px 0 0;"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--warn)"></span>Add a portfolio snapshot</h2>
+    <div class="field">
+      <label for="snapshotDate">Date</label>
+      <input type="date" id="snapshotDate">
+    </div>
+    <div id="snapshotEmpty" class="empty-note">Add a holding above first.</div>
+    <div id="snapshotInputs"></div>
+    <button class="add-btn" id="saveSnapshot" type="button" style="margin-top:4px;">Save snapshot</button>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--warn)"></span>Snapshot history</h2>
+    <div id="historyEmpty" class="empty-note">No snapshots recorded yet.</div>
+    <div id="historyList" class="sublist"></div>
+  </div>
+
   <footer>Illustrative only — not financial advice. Assumes constant monthly compounding at the selected growth rate; real markets fluctuate. UK ISA allowance shown is the current £20,000/tax year limit, checked approximately on a rolling 12-month basis.</footer>
 </div>
 
@@ -468,7 +536,8 @@
       lumpSums: lumpSums,
       increases: increases,
       withdrawals: withdrawals,
-      actuals: actuals
+      actuals: actuals,
+      portfolio: portfolio
     };
   }
 
@@ -493,7 +562,9 @@
   let lumpSums = [];     // { month: 'YYYY-MM', amount: number }
   let increases = [];    // { month: 'YYYY-MM', amount: number }
   let withdrawals = [];  // { month: 'YYYY-MM', amount: number }
-  let actuals = [];      // { month: 'YYYY-MM', balance: number } — real statement balances
+  let actuals = [];      // { month: 'YYYY-MM', balance: number, fromPortfolio?: true } — real statement balances
+  let portfolio = { holdings: [], snapshots: [] }; // holdings: {id,name,ticker}; snapshots: {date:'YYYY-MM-DD', values:{holdingId:{units,price}}}
+  let pendingPrices = {}; // holdingId -> price, staged from a pasted price list, applied on next snapshot save
   let lastResults = {};  // populated at the end of compute(), read by the export button
 
   // set at the end of each compute() run so renderActualList() can work out implied growth
@@ -543,10 +614,14 @@
     increases = Array.isArray(state.increases) ? state.increases : [];
     withdrawals = Array.isArray(state.withdrawals) ? state.withdrawals : [];
     actuals = Array.isArray(state.actuals) ? state.actuals : [];
+    portfolio = (state.portfolio && Array.isArray(state.portfolio.holdings) && Array.isArray(state.portfolio.snapshots))
+      ? state.portfolio
+      : { holdings: [], snapshots: [] };
     renderLumpList();
     renderIncreaseList();
     renderWithdrawList();
     renderActualList();
+    renderPortfolio();
   }
 
   // apply saved state (if any) before first compute
@@ -561,6 +636,7 @@
   $('withdrawYear').value = nowDefault.year;
   $('actMonth').value = nowDefault.month;
   $('actYear').value = nowDefault.year;
+  $('snapshotDate').value = new Date().toISOString().slice(0,10);
 
   function readYM(monthSelId, yearInputId){
     const month = $(monthSelId).value;
@@ -795,11 +871,255 @@
     el.innerHTML = rows.join('');
   }
 
+  // ---------- portfolio ledger (holdings + snapshots feeding into "actuals") ----------
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+
+  function fmtFullDate(iso){
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  }
+
+  function snapshotTotal(snapshot){
+    return Object.values(snapshot.values).reduce((sum, v) => sum + (v.units * v.price), 0);
+  }
+
+  function latestValueFor(holdingId){
+    for(let i = portfolio.snapshots.length - 1; i >= 0; i--){
+      const v = portfolio.snapshots[i].values[holdingId];
+      if(v) return v;
+    }
+    return null;
+  }
+
+  // recompute every portfolio-derived "actual" from the current holdings/snapshots and
+  // upsert them into the actuals array — this is what makes a saved snapshot show up on
+  // the growth chart's actual-vs-predicted line above, without touching manual entries
+  function syncAllPortfolioActuals(){
+    portfolio.snapshots.forEach(s => {
+      const month = s.date.slice(0,7);
+      const balance = Math.round(snapshotTotal(s));
+      const idx = actuals.findIndex(a => a.month === month);
+      if(idx >= 0){
+        actuals[idx] = {month, balance, fromPortfolio:true};
+      } else {
+        actuals.push({month, balance, fromPortfolio:true});
+      }
+    });
+  }
+
+  function renderPortfolio(){
+    renderHoldingsList();
+    renderSnapshotForm();
+    renderHistoryList();
+  }
+
+  function renderHoldingsList(){
+    const emptyEl = $('holdingsEmpty');
+    const listEl = $('holdingsList');
+    if(portfolio.holdings.length === 0){
+      emptyEl.style.display = 'block';
+      listEl.innerHTML = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = portfolio.holdings.map(h => {
+      const latest = latestValueFor(h.id);
+      const detail = latest
+        ? `${latest.units.toLocaleString('en-GB')} units @ £${latest.price.toFixed(2)} · ${gbp(latest.units*latest.price)}`
+        : 'No snapshot yet';
+      return `<div class="sublist-item">
+        <div class="meta"><b>${h.name}</b><span>${h.ticker ? h.ticker + ' · ' : ''}${detail}</span></div>
+        <button class="remove-btn" data-type="holding" data-id="${h.id}">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  function addHolding(){
+    const name = $('newFundName').value.trim();
+    const ticker = $('newFundTicker').value.trim();
+    if(!name) return;
+    portfolio.holdings.push({id: uid(), name, ticker});
+    $('newFundName').value = '';
+    $('newFundTicker').value = '';
+    renderPortfolio();
+    saveNow();
+  }
+
+  function removeHolding(id){
+    if(!confirm('Remove this holding? Its values in past snapshots will be dropped too, and any months whose actual balance came only from this holding will lose that entry.')) return;
+    portfolio.holdings = portfolio.holdings.filter(h => h.id !== id);
+    portfolio.snapshots.forEach(s => { delete s.values[id]; });
+    syncAllPortfolioActuals();
+    renderPortfolio();
+    compute();
+  }
+
+  function copyPriceRequest(){
+    if(portfolio.holdings.length === 0){
+      alert('Add some holdings first.');
+      return;
+    }
+    const lines = portfolio.holdings.map(h => `${h.name}${h.ticker ? ' (' + h.ticker + ')' : ''}`);
+    const msg = `Can you fetch today's prices for these funds and reply as a plain list, one per line, in the format "TICKER: £price"?\n\n${lines.join('\n')}`;
+    const btn = $('copyPriceRequest');
+    navigator.clipboard.writeText(msg).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied — paste into chat';
+      setTimeout(() => { btn.textContent = original; }, 2500);
+    }).catch(() => {
+      alert('Could not copy automatically — here is the request:\n\n' + msg);
+    });
+  }
+
+  function applyPastedPrices(){
+    const raw = $('pastePrices').value.trim();
+    const resultEl = $('applyPricesResult');
+    if(!raw){
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Paste a price list first.';
+      return;
+    }
+    const lines = raw.split('\n');
+    let matched = 0;
+    const unmatched = [];
+
+    lines.forEach(line => {
+      const priceMatch = line.match(/£\s*([\d,]+\.?\d*)/) || line.match(/([\d,]+\.\d+)\s*(?:GBP|£)?/);
+      if(!priceMatch) return;
+      const price = parseFloat(priceMatch[1].replace(/,/g,''));
+      if(isNaN(price)) return;
+
+      const lineLower = line.toLowerCase();
+      const holding = portfolio.holdings.find(h =>
+        (h.ticker && lineLower.includes(h.ticker.toLowerCase())) ||
+        lineLower.includes(h.name.toLowerCase()) ||
+        h.name.toLowerCase().split(' ').filter(w => w.length > 3).some(word => lineLower.includes(word))
+      );
+      if(holding){
+        pendingPrices[holding.id] = price;
+        matched++;
+      } else {
+        unmatched.push(line.trim());
+      }
+    });
+
+    resultEl.style.display = 'block';
+    if(matched > 0){
+      resultEl.textContent = `Matched ${matched} price${matched>1?'s':''} — scroll down to "Add a portfolio snapshot", prices are pre-filled. Just confirm your units.` + (unmatched.length ? ` (${unmatched.length} line(s) not matched to a holding.)` : '');
+    } else {
+      resultEl.textContent = 'Could not match any lines to your holdings. Check the format matches name/ticker + price.';
+    }
+    renderSnapshotForm();
+  }
+
+  function renderSnapshotForm(){
+    const container = $('snapshotInputs');
+    const emptyEl = $('snapshotEmpty');
+    const saveBtn = $('saveSnapshot');
+    if(portfolio.holdings.length === 0){
+      container.innerHTML = '';
+      emptyEl.style.display = 'block';
+      saveBtn.style.display = 'none';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    saveBtn.style.display = 'inline-block';
+    container.innerHTML = portfolio.holdings.map(h => {
+      const latest = latestValueFor(h.id);
+      const freshPrice = pendingPrices[h.id];
+      const priceVal = freshPrice !== undefined ? freshPrice : (latest ? latest.price : '');
+      return `<div class="holding-row">
+        <div class="name">${h.name}${freshPrice !== undefined ? ' <span class="fresh-tag">● fresh</span>' : ''}</div>
+        <div>
+          <label>Units</label>
+          <input type="number" step="any" id="snap_units_${h.id}" value="${latest ? latest.units : ''}" placeholder="0">
+        </div>
+        <div>
+          <label>Price (£)</label>
+          <input type="number" step="any" id="snap_price_${h.id}" value="${priceVal}" placeholder="0.00">
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function saveSnapshot(){
+    const date = $('snapshotDate').value;
+    if(!date){ alert('Pick a date for this snapshot.'); return; }
+    const values = {};
+    let any = false;
+    portfolio.holdings.forEach(h => {
+      const units = parseFloat($('snap_units_'+h.id).value);
+      const price = parseFloat($('snap_price_'+h.id).value);
+      if(!isNaN(units) && !isNaN(price)){
+        values[h.id] = {units, price};
+        any = true;
+      }
+    });
+    if(!any){ alert('Enter units and price for at least one holding.'); return; }
+
+    const existingIdx = portfolio.snapshots.findIndex(s => s.date === date);
+    if(existingIdx >= 0){
+      portfolio.snapshots[existingIdx].values = {...portfolio.snapshots[existingIdx].values, ...values};
+    } else {
+      portfolio.snapshots.push({date, values});
+      portfolio.snapshots.sort((a,b) => a.date.localeCompare(b.date));
+    }
+    pendingPrices = {};
+    syncAllPortfolioActuals();
+    renderPortfolio();
+    compute(); // recomputes the growth chart, actual list, and saves — includes the new actuals entry
+  }
+
+  function deleteSnapshot(date){
+    if(!confirm('Delete the snapshot from ' + fmtFullDate(date) + '?')) return;
+    portfolio.snapshots = portfolio.snapshots.filter(s => s.date !== date);
+    const month = date.slice(0,7);
+    const stillHasMonth = portfolio.snapshots.some(s => s.date.slice(0,7) === month);
+    if(!stillHasMonth){
+      const idx = actuals.findIndex(a => a.month === month && a.fromPortfolio);
+      if(idx >= 0) actuals.splice(idx,1);
+    }
+    syncAllPortfolioActuals();
+    renderPortfolio();
+    compute();
+  }
+
+  function renderHistoryList(){
+    const emptyEl = $('historyEmpty');
+    const listEl = $('historyList');
+    if(portfolio.snapshots.length === 0){
+      emptyEl.style.display = 'block';
+      listEl.innerHTML = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = portfolio.snapshots
+      .slice()
+      .reverse()
+      .map(s => `<div class="sublist-item">
+        <div class="meta"><b>${gbp(snapshotTotal(s))}</b><span>${fmtFullDate(s.date)}</span></div>
+        <button class="remove-btn" data-type="snapshot" data-date="${s.date}">✕</button>
+      </div>`).join('');
+  }
+
+  $('addHolding').addEventListener('click', addHolding);
+  $('copyPriceRequest').addEventListener('click', copyPriceRequest);
+  $('applyPastedPrices').addEventListener('click', applyPastedPrices);
+  $('saveSnapshot').addEventListener('click', saveSnapshot);
+
   document.body.addEventListener('click', e => {
     const btn = e.target.closest('.remove-btn');
     if(!btn) return;
-    const idx = Number(btn.dataset.idx);
     const type = btn.dataset.type;
+    if(type === 'holding'){
+      removeHolding(btn.dataset.id);
+      return; // removeHolding() handles its own re-render + compute()
+    }
+    if(type === 'snapshot'){
+      deleteSnapshot(btn.dataset.date);
+      return; // deleteSnapshot() handles its own re-render + compute()
+    }
+    const idx = Number(btn.dataset.idx);
     if(type === 'lump'){
       lumpSums.splice(idx,1);
       renderLumpList();
@@ -852,7 +1172,8 @@
     if(!month || isNaN(balance) || balance < 0){ return; }
     const existingIdx = actuals.findIndex(a => a.month === month);
     if(existingIdx >= 0){
-      actuals[existingIdx].balance = balance;
+      // fresh object (not a mutated one) so a manual edit drops any stale fromPortfolio flag
+      actuals[existingIdx] = {month, balance};
     } else {
       actuals.push({month, balance});
     }
