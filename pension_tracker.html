@@ -107,6 +107,26 @@
     color-scheme:dark;
   }
   input[type="number"]:focus, input[type="text"]:focus, input[type="date"]:focus{ border-color:var(--accent); }
+  textarea{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 11px;
+    border-radius:9px;
+    font-size:0.9rem;
+    font-family:inherit;
+    outline:none;
+    resize:vertical;
+  }
+  textarea:focus{border-color:var(--accent);}
+  .sp-refresh{
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+    margin:-6px 0 16px;
+  }
   /* Hide native spin buttons — in narrow columns (e.g. "Year", "Starts at age") they ate enough
      width to clip the value itself. Scroll wheel / keyboard up-down still work. */
   input[type="number"]{-moz-appearance:textfield;}
@@ -838,6 +858,19 @@
           </div>
         </div>
         <p class="hint" style="margin-top:-6px;">Defaults to the full new State Pension for 2026/27 (£241.30/week, needs 35 qualifying NI years). Your actual entitlement may differ — check your <a href="https://www.gov.uk/check-state-pension" target="_blank" rel="noopener">personal forecast on gov.uk</a> and adjust the figure above.</p>
+
+        <div class="sp-refresh">
+          <p class="hint" style="margin:0 0 10px;">The State Pension is uprated every April (currently via the "triple lock"), so this figure goes stale within the year. Get the latest instead of guessing:</p>
+          <button class="add-btn" id="copySpRequest" type="button">Copy state pension check request</button>
+          <div class="field" style="margin:12px 0 0;">
+            <label for="pasteSp">Paste Claude's reply here</label>
+            <textarea id="pasteSp" rows="2" placeholder="e.g. The full new State Pension for 2026/27 is £241.30/week (£12,548/year)."></textarea>
+          </div>
+          <button class="add-btn" id="applySpReply" type="button" style="margin-top:10px;">Apply</button>
+          <div id="spApplyResult" class="hint" style="display:none;margin:10px 0 0;"></div>
+          <p class="hint" id="spLastUpdated" style="margin:10px 0 0;"></p>
+        </div>
+
         <div class="field" style="margin-bottom:0;">
           <label for="planToAge">Plan pots to last until age</label>
           <input type="number" id="planToAge" value="90" min="66" max="110" step="1">
@@ -1015,6 +1048,7 @@
     Object.keys(ARRAY_STATE).forEach(key => { state[key] = ARRAY_STATE[key](); });
     state.savingsPreProjected = savingsPreProjected;
     state.isaPreProjected = isaPreProjected;
+    state.statePensionUpdatedAt = statePensionUpdatedAt;
     return state;
   }
 
@@ -1050,6 +1084,7 @@
     drawdownAlloc = Array.isArray(saved.drawdownAlloc) ? saved.drawdownAlloc : [];
     savingsPreProjected = !!saved.savingsPreProjected;
     isaPreProjected = !!saved.isaPreProjected;
+    statePensionUpdatedAt = saved.statePensionUpdatedAt || null;
 
     $('dbLumpTaken').value = 0;
     $('dbLumpMode').value = 'gbp';
@@ -1065,6 +1100,7 @@
     renderAllocTable();
     renderHistoryTable();
     setNextHistoryDateDefault();
+    renderSpLastUpdated();
     compute();
   }
 
@@ -1087,6 +1123,7 @@
   // of compounding it further — cleared automatically if the balance/monthly fields are hand-edited
   let savingsPreProjected = false;
   let isaPreProjected = false;
+  let statePensionUpdatedAt = null; // ISO date string — last time the State Pension figure was refreshed via the copy/paste helper
 
   function downloadJSON(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
@@ -1194,6 +1231,8 @@
   $('drawdownTaxRate').value = (saved && saved.drawdownTaxRate) != null ? saved.drawdownTaxRate : 25;
   savingsPreProjected = !!(saved && saved.savingsPreProjected);
   isaPreProjected = !!(saved && saved.isaPreProjected);
+  statePensionUpdatedAt = (saved && saved.statePensionUpdatedAt) || null;
+  renderSpLastUpdated();
   lumpSums = (saved && Array.isArray(saved.lumpSums)) ? saved.lumpSums : [];
   changes = (saved && Array.isArray(saved.changes)) ? saved.changes : [];
   salaryChanges = (saved && Array.isArray(saved.salaryChanges)) ? saved.salaryChanges : [];
@@ -1634,6 +1673,73 @@
     $('histYear').value = y + 1;
   }
 
+  // ---------- State Pension refresh helper ----------
+  function renderSpLastUpdated(){
+    const el = $('spLastUpdated');
+    if(!el) return;
+    el.textContent = statePensionUpdatedAt
+      ? `Last refreshed ${new Date(statePensionUpdatedAt).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'})}.`
+      : 'Not refreshed via this tool yet — using the default above (or your own entry).';
+  }
+
+  $('copySpRequest').addEventListener('click', () => {
+    const today = new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
+    const msg = `What is the current full UK new State Pension amount right now (as of ${today})? Reply with just the weekly and annual £ figures, e.g. "£241.30/week (£12,548/year)".`;
+    const btn = $('copySpRequest');
+    navigator.clipboard.writeText(msg).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied — paste into chat';
+      setTimeout(() => { btn.textContent = original; }, 2500);
+    }).catch(() => {
+      alert('Could not copy automatically — here is the request:\n\n' + msg);
+    });
+  });
+
+  $('applySpReply').addEventListener('click', () => {
+    const raw = $('pasteSp').value.trim();
+    const resultEl = $('spApplyResult');
+    if(!raw){
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Paste a reply first.';
+      return;
+    }
+    let annual = null;
+    let source = '';
+    const annualMatch = raw.match(/£\s*([\d,]+(?:\.\d+)?)\s*(?:\/\s*(?:year|yr)|p\.?a\.?|annually|per year)/i);
+    if(annualMatch){
+      annual = parseFloat(annualMatch[1].replace(/,/g,''));
+      source = 'annual figure';
+    } else {
+      const weeklyMatch = raw.match(/£\s*([\d,]+(?:\.\d+)?)\s*(?:\/\s*(?:week|wk)|per week|weekly)/i);
+      if(weeklyMatch){
+        const weekly = parseFloat(weeklyMatch[1].replace(/,/g,''));
+        annual = Math.round(weekly * 52);
+        source = `weekly figure (£${weekly.toFixed(2)}/week × 52)`;
+      } else {
+        // fallback: take the largest £ figure over £1,000 mentioned (annual-sized, not weekly-sized)
+        const candidates = [...raw.matchAll(/£\s*([\d,]+(?:\.\d+)?)/g)]
+          .map(m => parseFloat(m[1].replace(/,/g,'')))
+          .filter(n => n > 1000);
+        if(candidates.length){
+          annual = Math.round(Math.max(...candidates));
+          source = 'best-guess annual figure';
+        }
+      }
+    }
+    if(annual === null || isNaN(annual)){
+      resultEl.style.display = 'block';
+      resultEl.textContent = "Couldn't find a £ figure in that reply — paste the weekly or annual amount and try again.";
+      return;
+    }
+    $('statePension').value = annual;
+    statePensionUpdatedAt = new Date().toISOString();
+    resultEl.style.display = 'block';
+    resultEl.textContent = `Set to ${gbp(annual)}/year from the ${source} in your paste.`;
+    $('pasteSp').value = '';
+    renderSpLastUpdated();
+    compute();
+  });
+
   function renderDormantList(){
     const el = $('dormantList');
     if(dormantDC.length === 0){
@@ -2048,6 +2154,7 @@
     try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
     savingsPreProjected = false;
     isaPreProjected = false;
+    statePensionUpdatedAt = null;
     lumpSums = [];
     changes = [];
     salaryChanges = [];
@@ -2096,6 +2203,7 @@
     renderAllocTable();
     renderHistoryTable();
     setNextHistoryDateDefault();
+    renderSpLastUpdated();
     compute();
   });
 
