@@ -12,6 +12,8 @@
     });
   }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
 <style>
   :root{
     --bg:#0d130f;
@@ -358,6 +360,7 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if(window.CloudSync) CloudSync.push('savings', state);
       const status = $('saveStatus');
       if(status){
         status.textContent = 'Saved just now in this browser.';
@@ -654,6 +657,16 @@
   initChart();
   renderAcctLabels();
   compute();
+
+  if(window.CloudSync){
+    CloudSync.onAuthChange(function(user){
+      if(user){
+        CloudSync.pull('savings').then(function(cloudState){
+          if(cloudState){ applyState(cloudState); compute(); }
+        });
+      }
+    });
+  }
 })();
 </script>
 </body>
