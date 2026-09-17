@@ -31,6 +31,7 @@
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   let currentUser = null;
+  let pendingEmail = null; // set once a code has been sent, until verified or restarted
   const authListeners = [];
   let sessionReadyResolve;
   const sessionReady = new Promise(res => { sessionReadyResolve = res; });
@@ -55,14 +56,14 @@
         display:flex;align-items:center;gap:10px;flex-wrap:wrap;
       }
       #cloudSyncBanner #csStatus{flex:1;min-width:200px;color:var(--muted, #96a2b8);}
-      #cloudSyncBanner input[type="email"]{
+      #cloudSyncBanner input[type="email"], #cloudSyncBanner input[type="text"]{
         max-width:220px;padding:7px 10px;border-radius:7px;
         border:1px solid var(--border, #2a3444);
         background:var(--panel, #151b24);
         color:var(--text, #eaeef4);
         font-size:0.82rem;outline:none;
       }
-      #cloudSyncBanner input[type="email"]:focus{border-color:var(--accent, #4aa8ff);}
+      #cloudSyncBanner input[type="email"]:focus, #cloudSyncBanner input[type="text"]:focus{border-color:var(--accent, #4aa8ff);}
       #cloudSyncBanner button{
         padding:7px 14px;border-radius:7px;border:none;cursor:pointer;
         font-weight:700;font-size:0.8rem;white-space:nowrap;
@@ -84,7 +85,10 @@
     wrap.innerHTML = `
       <span id="csStatus"></span>
       <input type="email" id="csEmail" placeholder="you@email.com" style="display:none;">
-      <button id="csSendLink" type="button" style="display:none;">Send magic link</button>
+      <button id="csSendLink" type="button" style="display:none;">Send code</button>
+      <input type="text" id="csCode" placeholder="6-digit code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="display:none;width:110px;">
+      <button id="csVerifyCode" type="button" style="display:none;">Confirm code</button>
+      <button id="csRestart" type="button" class="cs-secondary" style="display:none;">Use a different email</button>
       <button id="csSignOut" type="button" class="cs-secondary" style="display:none;">Sign out</button>
     `;
     document.body.insertBefore(wrap, document.body.firstChild);
@@ -94,15 +98,19 @@
       const email = emailEl.value.trim();
       const statusEl = $cs('csStatus');
       if(!email) return;
-      statusEl.textContent = 'Sending link…';
+      statusEl.textContent = 'Sending code…';
       try{
         const { error } = await client.auth.signInWithOtp({
           email,
           options: { emailRedirectTo: window.location.href }
         });
-        statusEl.textContent = error
-          ? ('Could not send link: ' + error.message)
-          : `Check ${email} for a sign-in link, then open it on this device.`;
+        if(error){
+          statusEl.textContent = 'Could not send code: ' + error.message;
+        } else {
+          pendingEmail = email;
+          statusEl.textContent = `Check ${email} — on a Mac you can tap the link; on a home-screen app, type the 6-digit code from that email below.`;
+          updateVisibility();
+        }
       }catch(e){
         statusEl.textContent = 'Could not reach the sync service — check your connection.';
       }
@@ -112,28 +120,84 @@
       if(e.key === 'Enter') $cs('csSendLink').click();
     });
 
+    $cs('csVerifyCode').addEventListener('click', async () => {
+      const codeEl = $cs('csCode');
+      const code = codeEl.value.trim();
+      const statusEl = $cs('csStatus');
+      if(!code || !pendingEmail) return;
+      statusEl.textContent = 'Checking code…';
+      try{
+        const { error } = await client.auth.verifyOtp({ email: pendingEmail, token: code, type: 'email' });
+        if(error){
+          statusEl.textContent = "That code didn't work — check it and try again: " + error.message;
+        }
+        // on success, onAuthStateChange fires and renderBanner() takes over the status text
+      }catch(e){
+        statusEl.textContent = 'Could not reach the sync service — check your connection.';
+      }
+    });
+
+    $cs('csCode').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') $cs('csVerifyCode').click();
+    });
+
+    $cs('csRestart').addEventListener('click', () => {
+      pendingEmail = null;
+      $cs('csCode').value = '';
+      $cs('csStatus').textContent = '☁ Not signed in — data stays on this device only.';
+      updateVisibility();
+    });
+
     $cs('csSignOut').addEventListener('click', async () => {
       try{ await client.auth.signOut(); }catch(e){ /* ignore */ }
+      pendingEmail = null;
     });
+  }
+
+  function updateVisibility(){
+    const emailEl = $cs('csEmail');
+    if(!emailEl) return; // banner not injected yet (DOM not ready)
+    const sendBtn = $cs('csSendLink');
+    const codeEl = $cs('csCode');
+    const verifyBtn = $cs('csVerifyCode');
+    const restartBtn = $cs('csRestart');
+    const outBtn = $cs('csSignOut');
+    if(currentUser){
+      emailEl.style.display = 'none';
+      sendBtn.style.display = 'none';
+      codeEl.style.display = 'none';
+      verifyBtn.style.display = 'none';
+      restartBtn.style.display = 'none';
+      outBtn.style.display = 'inline-block';
+    } else if(pendingEmail){
+      emailEl.style.display = 'none';
+      sendBtn.style.display = 'none';
+      codeEl.style.display = 'inline-block';
+      verifyBtn.style.display = 'inline-block';
+      restartBtn.style.display = 'inline-block';
+      outBtn.style.display = 'none';
+    } else {
+      emailEl.style.display = 'inline-block';
+      sendBtn.style.display = 'inline-block';
+      codeEl.style.display = 'none';
+      verifyBtn.style.display = 'none';
+      restartBtn.style.display = 'none';
+      outBtn.style.display = 'none';
+    }
   }
 
   function renderBanner(){
     const statusEl = $cs('csStatus');
     if(!statusEl) return; // banner not injected yet (DOM not ready)
-    const emailEl = $cs('csEmail');
-    const sendBtn = $cs('csSendLink');
-    const outBtn = $cs('csSignOut');
+    updateVisibility();
     if(currentUser){
+      pendingEmail = null;
       statusEl.textContent = `☁ Synced as ${currentUser.email}`;
-      emailEl.style.display = 'none';
-      sendBtn.style.display = 'none';
-      outBtn.style.display = 'inline-block';
-    } else {
+    } else if(!pendingEmail){
       statusEl.textContent = '☁ Not signed in — data stays on this device only.';
-      emailEl.style.display = 'inline-block';
-      sendBtn.style.display = 'inline-block';
-      outBtn.style.display = 'none';
     }
+    // if pendingEmail is set but no user yet, leave the status text as whatever
+    // the send/verify handler above last set (the "check your email" message).
   }
 
   function onReady(fn){
