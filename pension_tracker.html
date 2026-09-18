@@ -1058,7 +1058,7 @@
     try{
       const state = buildStateObject();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync){
+      if(window.CloudSync && cloudCheckDone){
         CloudSync.push('pension', {
           tracker: 'retirement-planner',
           exportedAt: new Date().toISOString(),
@@ -1129,6 +1129,7 @@
                             // sourced from one of 'lump'/'savings'/'drawdown' (isa actions only)
   let drawdownAlloc = [];  // { pot, sav, isa } (%), index = year of retirement -> shortfall split, all 3 scenarios
   let lastResults = {};    // populated at the end of compute(), read by the export button
+  let cloudCheckDone = false; // gates CloudSync.push() until the initial cloud check has resolved
   // when true, the Savings/ISA balance field already IS the projected-at-retirement value
   // (imported from the Savings/ISA tracker), so savingsSeries()/isaSeries() hold it flat instead
   // of compounding it further — cleared automatically if the balance/monthly fields are hand-edited
@@ -3094,10 +3095,20 @@
     CloudSync.onAuthChange(function(user){
       if(user){
         CloudSync.pull('pension').then(function(cloudSummary){
-          if(cloudSummary && cloudSummary.state){ restoreState(cloudSummary.state); }
+          if(cloudSummary && cloudSummary.state){
+            cloudCheckDone = true;
+            restoreState(cloudSummary.state); // restoreState() calls compute() itself at the end
+          } else {
+            cloudCheckDone = true;
+            compute();
+          }
         });
+      } else {
+        cloudCheckDone = true;
       }
     });
+  } else {
+    cloudCheckDone = true;
   }
 })();
 </script>

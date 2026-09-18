@@ -547,7 +547,7 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync){
+      if(window.CloudSync && cloudCheckDone){
         CloudSync.push('isa', {
           tracker: 'isa',
           exportedAt: new Date().toISOString(),
@@ -576,6 +576,9 @@
   let portfolio = { holdings: [], snapshots: [] }; // holdings: {id,name,ticker}; snapshots: {date:'YYYY-MM-DD', values:{holdingId:{units,price}}}
   let pendingPrices = {}; // holdingId -> price, staged from a pasted price list, applied on next snapshot save
   let lastResults = {};  // populated at the end of compute(), read by the export button
+  // gates CloudSync.push() until the initial cloud check (sign-in state + pull) has resolved,
+  // so a page load never blindly pushes local defaults over real data saved from another device
+  let cloudCheckDone = false;
 
   // set at the end of each compute() run so renderActualList() can work out implied growth
   let lastMonthlyContribAmounts = null;
@@ -1402,10 +1405,16 @@
     CloudSync.onAuthChange(function(user){
       if(user){
         CloudSync.pull('isa').then(function(cloudSummary){
-          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); }
+          cloudCheckDone = true;
+          compute();
         });
+      } else {
+        cloudCheckDone = true;
       }
     });
+  } else {
+    cloudCheckDone = true;
   }
 })();
 </script>

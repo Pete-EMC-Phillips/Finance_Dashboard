@@ -338,6 +338,7 @@
   let acctNames = ['Account 1','Account 2','Account 3','Account 4'];
   let entries = []; // { month:'YYYY-MM', balances:[n,n,n,n] } -- kept sorted newest-first
   let lastResults = {};
+  let cloudCheckDone = false; // gates CloudSync.push() until the initial cloud check has resolved
   let savingsChart; // declared early so applyState()'s renderAcctLabels() can safely check it
 
   function downloadJSON(filename, obj){
@@ -360,7 +361,7 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync){
+      if(window.CloudSync && cloudCheckDone){
         CloudSync.push('savings', {
           tracker: 'savings',
           exportedAt: new Date().toISOString(),
@@ -669,10 +670,16 @@
     CloudSync.onAuthChange(function(user){
       if(user){
         CloudSync.pull('savings').then(function(cloudSummary){
-          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); }
+          cloudCheckDone = true;
+          compute();
         });
+      } else {
+        cloudCheckDone = true;
       }
     });
+  } else {
+    cloudCheckDone = true;
   }
 })();
 </script>

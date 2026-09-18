@@ -338,6 +338,7 @@
   let cardNames = ['Card 1','Card 2','Card 3','Card 4'];
   let entries = []; // { month:'YYYY-MM', balances:[n,n,n,n] } -- kept sorted newest-first
   let lastResults = {};
+  let cloudCheckDone = false; // gates CloudSync.push() until the initial cloud check has resolved
   let debtChart; // declared early so applyState()'s renderCardLabels() can safely check it
 
   function downloadJSON(filename, obj){
@@ -360,7 +361,7 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync){
+      if(window.CloudSync && cloudCheckDone){
         CloudSync.push('creditcard', {
           tracker: 'creditcard',
           exportedAt: new Date().toISOString(),
@@ -669,10 +670,16 @@
     CloudSync.onAuthChange(function(user){
       if(user){
         CloudSync.pull('creditcard').then(function(cloudSummary){
-          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); }
+          cloudCheckDone = true;
+          compute();
         });
+      } else {
+        cloudCheckDone = true;
       }
     });
+  } else {
+    cloudCheckDone = true;
   }
 })();
 </script>

@@ -344,6 +344,7 @@
   let incomeItems = [];
   let debitItems = [];
   let lastResults = {};  // populated at the end of compute(), read by the export button
+  let cloudCheckDone = false; // gates CloudSync.push() until the initial cloud check has resolved
 
   function downloadJSON(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
@@ -370,7 +371,7 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync){
+      if(window.CloudSync && cloudCheckDone){
         CloudSync.push('budget', {
           tracker: 'budget',
           exportedAt: new Date().toISOString(),
@@ -644,10 +645,16 @@
     CloudSync.onAuthChange(function(user){
       if(user){
         CloudSync.pull('budget').then(function(cloudSummary){
-          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); }
+          cloudCheckDone = true;
+          compute();
         });
+      } else {
+        cloudCheckDone = true;
       }
     });
+  } else {
+    cloudCheckDone = true;
   }
 })();
 </script>
