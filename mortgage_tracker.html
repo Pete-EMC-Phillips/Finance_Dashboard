@@ -398,7 +398,14 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync) CloudSync.push('mortgage', state);
+      if(window.CloudSync){
+        CloudSync.push('mortgage', {
+          tracker: 'mortgage',
+          exportedAt: new Date().toISOString(),
+          ...lastResults,
+          state
+        });
+      }
       const status = $('saveStatus');
       if(status){
         status.textContent = 'Saved just now in this browser.';
@@ -746,8 +753,8 @@
   if(window.CloudSync){
     CloudSync.onAuthChange(function(user){
       if(user){
-        CloudSync.pull('mortgage').then(function(cloudState){
-          if(cloudState){ applyState(cloudState); compute(); }
+        CloudSync.pull('mortgage').then(function(cloudSummary){
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
         });
       }
     });

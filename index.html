@@ -1044,15 +1044,23 @@
 
   if(window.CloudSync){
     CloudSync.onAuthChange(function(user){
-      if(user){
-        CloudSync.pull('dashboard').then(function(cloudState){
-          if(cloudState){
-            data = cloudState;
-            data.netWorthSnapshots = Array.isArray(data.netWorthSnapshots) ? data.netWorthSnapshots : [];
-            render();
-          }
+      if(!user) return;
+      CloudSync.pull('dashboard').then(function(cloudState){
+        if(cloudState){
+          data = cloudState;
+          data.netWorthSnapshots = Array.isArray(data.netWorthSnapshots) ? data.netWorthSnapshots : [];
+          render();
+        }
+        // Live-link each tracker's cloud summary straight into the dashboard —
+        // no more manual export/import once you're signed in on both ends.
+        const trackerKeys = ['isa','pension','mortgage','budget','creditcard','savings'];
+        Promise.all(trackerKeys.map(key =>
+          CloudSync.pull(key).then(summary => { if(summary) data[key] = summary; })
+        )).then(() => {
+          saveNow();
+          render();
         });
-      }
+      });
     });
   }
 })();

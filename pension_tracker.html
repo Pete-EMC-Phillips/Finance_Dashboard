@@ -1058,7 +1058,14 @@
     try{
       const state = buildStateObject();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync) CloudSync.push('pension', state);
+      if(window.CloudSync){
+        CloudSync.push('pension', {
+          tracker: 'retirement-planner',
+          exportedAt: new Date().toISOString(),
+          ...lastResults,
+          state
+        });
+      }
       const status = $('saveStatus');
       if(status){
         status.textContent = 'Saved just now in this browser.';
@@ -3086,8 +3093,8 @@
   if(window.CloudSync){
     CloudSync.onAuthChange(function(user){
       if(user){
-        CloudSync.pull('pension').then(function(cloudState){
-          if(cloudState){ restoreState(cloudState); }
+        CloudSync.pull('pension').then(function(cloudSummary){
+          if(cloudSummary && cloudSummary.state){ restoreState(cloudSummary.state); }
         });
       }
     });

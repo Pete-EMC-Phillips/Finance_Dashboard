@@ -370,7 +370,14 @@
     try{
       const state = buildState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      if(window.CloudSync) CloudSync.push('budget', state);
+      if(window.CloudSync){
+        CloudSync.push('budget', {
+          tracker: 'budget',
+          exportedAt: new Date().toISOString(),
+          ...lastResults,
+          state
+        });
+      }
       const status = $('saveStatus');
       if(status){
         status.textContent = 'Saved just now in this browser.';
@@ -636,8 +643,8 @@
   if(window.CloudSync){
     CloudSync.onAuthChange(function(user){
       if(user){
-        CloudSync.pull('budget').then(function(cloudState){
-          if(cloudState){ applyState(cloudState); compute(); }
+        CloudSync.pull('budget').then(function(cloudSummary){
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); compute(); }
         });
       }
     });
