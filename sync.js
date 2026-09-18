@@ -86,7 +86,7 @@
       <span id="csStatus"></span>
       <input type="email" id="csEmail" placeholder="you@email.com" style="display:none;">
       <button id="csSendLink" type="button" style="display:none;">Send code</button>
-      <input type="text" id="csCode" placeholder="6-digit code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="display:none;width:110px;">
+      <input type="text" id="csCode" placeholder="code from email" inputmode="numeric" autocomplete="one-time-code" maxlength="12" style="display:none;width:130px;">
       <button id="csVerifyCode" type="button" style="display:none;">Confirm code</button>
       <button id="csRestart" type="button" class="cs-secondary" style="display:none;">Use a different email</button>
       <button id="csSignOut" type="button" class="cs-secondary" style="display:none;">Sign out</button>
@@ -108,7 +108,7 @@
           statusEl.textContent = 'Could not send code: ' + error.message;
         } else {
           pendingEmail = email;
-          statusEl.textContent = `Check ${email} — on a Mac you can tap the link; on a home-screen app, type the 6-digit code from that email below.`;
+          statusEl.textContent = `Check ${email} — on a Mac you can tap the link; on a home-screen app, type the code from that email below.`;
           updateVisibility();
         }
       }catch(e){
