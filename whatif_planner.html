@@ -280,6 +280,7 @@
           <input type="range" id="taxFreeCash" min="0" max="0" step="500" value="0">
           <div class="slider-val" id="taxFreeCashVal">£0</div>
         </div>
+        <div class="slider-minmax"><span>Max you're allowed to take: <strong id="taxFreeCashMaxLabel">£0</strong></span></div>
       </div>
     </div>
   </div>
@@ -778,14 +779,21 @@
     // ---- tax-free cash (PCLS) withdrawn from the DC pension at retirement ----
     // UK rules: up to 25% of the pot, but never more than the Lump Sum Allowance (£268,275,
     // 2026/27) minus any tax-free cash already taken elsewhere (e.g. a DB scheme lump sum).
-    const dbCashTaken = parseFloat($('dbCashTaken').value) || 0;
+    // dbCashTaken is parsed defensively (stripping £/commas/spaces) so a pasted or typed figure
+    // like "£265,000" can't silently be read as a much smaller number and under-reduce the cap.
+    const dbCashTakenRaw = String($('dbCashTaken').value || '').replace(/[^0-9.\-]/g, '');
+    const dbCashTaken = Math.max(0, parseFloat(dbCashTakenRaw) || 0);
     const lsaRemaining = Math.max(0, LSA - dbCashTaken);
     const maxTaxFreeCash = Math.max(0, Math.min(pensionBal * 0.25, lsaRemaining));
     const taxFreeCashSlider = $('taxFreeCash');
     taxFreeCashSlider.max = Math.round(maxTaxFreeCash);
-    if(parseFloat(taxFreeCashSlider.value) > maxTaxFreeCash) taxFreeCashSlider.value = Math.round(maxTaxFreeCash);
+    // Always clamp AND write the slider's own value back to whatever is actually being withdrawn —
+    // not just when it's over the cap — so the thumb, the label and the real calculation can never
+    // drift apart, regardless of the order the browser applies min/max/value changes in.
     const taxFreeCashWithdrawn = Math.min(parseFloat(taxFreeCashSlider.value) || 0, maxTaxFreeCash);
+    taxFreeCashSlider.value = Math.round(taxFreeCashWithdrawn);
     $('taxFreeCashVal').textContent = gbp(taxFreeCashWithdrawn);
+    $('taxFreeCashMaxLabel').textContent = gbp(maxTaxFreeCash);
 
     pensionBal -= taxFreeCashWithdrawn; // cash comes out of the pot tax-free; the rest funds drawdown as normal
     // the accumulation-phase chart point at the retirement age should reflect the pot *after* cash is taken
