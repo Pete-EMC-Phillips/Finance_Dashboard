@@ -46,10 +46,10 @@
   header{margin-bottom:10px;}
   header h1{font-size:1.25rem;margin:0 0 2px;display:flex;align-items:center;gap:8px;}
   header p{color:var(--muted);margin:0;font-size:0.78rem;}
-  .layout{display:grid;grid-template-columns:340px 1fr;gap:12px;align-items:start;}
-  @media (max-width: 960px){ .layout{grid-template-columns:1fr;} }
-  .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+  .results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;align-items:start;margin-bottom:12px;}
   @media (max-width: 760px){ .results-grid{grid-template-columns:1fr;} }
+  .sliders-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 26px;}
+  .hidden-block{display:none;}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;}
   .results-grid .card{margin-bottom:0;}
   .card h2{font-size:0.85rem;margin:0 0 8px;color:var(--text);display:flex;align-items:center;gap:8px;}
@@ -146,14 +146,109 @@
     This is a sandbox: it starts from your real numbers but nothing you do here is saved back to your ISA, pension, mortgage or savings trackers. It assumes one fixed growth rate per year rather than real market ups and downs — a future update will add a probability-based (Monte Carlo) view alongside this one.
   </div>
 
-  <div class="layout">
-    <!-- CONTROLS -->
-    <div>
-      <details class="card starting-details">
-        <summary>⚙ Starting figures (from your trackers) — view or edit</summary>
-        <p class="hint">Pulled live from your trackers when signed in and refreshed; edit any figure by hand otherwise.</p>
-        <h3>Savings &amp; pension</h3>
-        <div class="row2">
+  <!-- RESULTS -->
+  <div class="results-grid">
+    <div class="card chart-card">
+      <h2><span class="dot"></span>ISA + pension to retirement</h2>
+      <canvas id="growthChart" height="80"></canvas>
+      <div class="summary-grid" style="margin-top:8px;">
+        <div class="stat isa">
+          <div class="label">ISA</div>
+          <div class="value" id="statIsaAtRetirement">£0</div>
+        </div>
+        <div class="stat pension">
+          <div class="label">Pension</div>
+          <div class="value" id="statPensionAtRetirement">£0</div>
+        </div>
+        <div class="stat total">
+          <div class="label">Combined</div>
+          <div class="value" id="statCombinedAtRetirement">£0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card chart-card">
+      <h2><span class="dot"></span>Annual spend by source</h2>
+      <canvas id="spendChart" height="80"></canvas>
+      <p class="chart-note">State Pension, DB/other income, DC pension &amp; ISA vs your target (dashed).</p>
+    </div>
+
+    <div class="card">
+      <h2><span class="dot"></span>Mortgage overpayment effect</h2>
+      <div class="summary-grid-2">
+        <div class="stat mortgage">
+          <div class="label">Baseline payoff</div>
+          <div class="value" id="statMortgageBaseline">—</div>
+        </div>
+        <div class="stat mortgage">
+          <div class="label">With extra overpayment</div>
+          <div class="value" id="statMortgageWithExtra">—</div>
+        </div>
+      </div>
+      <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
+    </div>
+
+    <div class="card chart-card">
+      <h2><span class="dot"></span>Retirement pot balance</h2>
+      <canvas id="drawdownChart" height="80"></canvas>
+      <div id="drawdownOutcome" class="outcome-box good">—</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="card">
+    <h2><span class="dot"></span>What if…?</h2>
+    <div class="sliders-grid">
+      <div class="field">
+        <label for="retireAge">Retirement age</label>
+        <div class="slider-row">
+          <input type="range" id="retireAge" min="45" max="75" step="1" value="65">
+          <div class="slider-val" id="retireAgeVal">65</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="isaMonthly">ISA monthly contribution</label>
+        <div class="slider-row">
+          <input type="range" id="isaMonthly" min="0" max="3000" step="10" value="150">
+          <div class="slider-val" id="isaMonthlyVal">£150</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="mortgageExtraOverpay">Extra mortgage overpayment</label>
+        <div class="slider-row">
+          <input type="range" id="mortgageExtraOverpay" min="0" max="1000" step="10" value="0">
+          <div class="slider-val" id="mortgageExtraOverpayVal">£0</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="incomeLevel1">Income until the age below</label>
+        <div class="slider-row">
+          <input type="range" id="incomeLevel1" min="0" max="120000" step="500" value="25000">
+          <div class="slider-val" id="incomeLevel1Val">£25,000</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="secondAge">Income drops at age</label>
+        <div class="slider-row">
+          <input type="range" id="secondAge" min="66" max="90" step="1" value="75">
+          <div class="slider-val" id="secondAgeVal">75</div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="incomeLevel2">Income from that age on</label>
+        <div class="slider-row">
+          <input type="range" id="incomeLevel2" min="0" max="120000" step="500" value="18000">
+          <div class="slider-val" id="incomeLevel2Val">£18,000</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <details class="card starting-details">
+    <summary>⚙ Starting figures (from your trackers) — view or edit</summary>
+    <p class="hint">Pulled live from your trackers when signed in and refreshed; edit any figure by hand otherwise.</p>
+    <h3>Savings &amp; pension</h3>
+    <div class="row2">
           <div class="field">
             <label for="currentAge">Current age</label>
             <input type="number" id="currentAge" value="35" min="16" max="80" step="1">
@@ -209,126 +304,30 @@
         </div>
       </div>
 
-        <h3>Mortgage</h3>
-        <div class="row2">
-          <div class="field">
-            <label for="mortgageBalance">Balance left (£)</label>
-            <input type="number" id="mortgageBalance" value="200000" min="0" step="1000">
+        <div class="hidden-block">
+          <h3>Mortgage</h3>
+          <div class="row2">
+            <div class="field">
+              <label for="mortgageBalance">Balance left (£)</label>
+              <input type="number" id="mortgageBalance" value="200000" min="0" step="1000">
+            </div>
+            <div class="field">
+              <label for="mortgageRate">Interest rate (%)</label>
+              <input type="number" id="mortgageRate" value="4.24" min="0" max="15" step="0.01">
+            </div>
           </div>
-          <div class="field">
-            <label for="mortgageRate">Interest rate (%)</label>
-            <input type="number" id="mortgageRate" value="4.24" min="0" max="15" step="0.01">
-          </div>
-        </div>
-        <div class="row2">
-          <div class="field">
-            <label for="mortgagePayment">Monthly payment (£)</label>
-            <input type="number" id="mortgagePayment" value="1100" min="0" step="10">
-          </div>
-          <div class="field">
-            <label for="mortgageOverpayBaseline">Current overpayment (£/mo)</label>
-            <input type="number" id="mortgageOverpayBaseline" value="0" min="0" step="10">
+          <div class="row2">
+            <div class="field">
+              <label for="mortgagePayment">Monthly payment (£)</label>
+              <input type="number" id="mortgagePayment" value="1100" min="0" step="10">
+            </div>
+            <div class="field">
+              <label for="mortgageOverpayBaseline">Current overpayment (£/mo)</label>
+              <input type="number" id="mortgageOverpayBaseline" value="0" min="0" step="10">
+            </div>
           </div>
         </div>
       </details>
-
-      <div class="card">
-        <h2><span class="dot"></span>What if…?</h2>
-        <div class="field">
-          <label for="retireAge">Retirement age</label>
-          <div class="slider-row">
-            <input type="range" id="retireAge" min="45" max="75" step="1" value="65">
-            <div class="slider-val" id="retireAgeVal">65</div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="isaMonthly">ISA monthly contribution</label>
-          <div class="slider-row">
-            <input type="range" id="isaMonthly" min="0" max="3000" step="10" value="150">
-            <div class="slider-val" id="isaMonthlyVal">£150</div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="mortgageExtraOverpay">Extra mortgage overpayment</label>
-          <div class="slider-row">
-            <input type="range" id="mortgageExtraOverpay" min="0" max="1000" step="10" value="0">
-            <div class="slider-val" id="mortgageExtraOverpayVal">£0</div>
-          </div>
-          <p class="hint" style="margin:6px 0 0;">On top of the current overpayment above.</p>
-        </div>
-        <div class="field">
-          <label for="incomeLevel1">Income until the age below</label>
-          <div class="slider-row">
-            <input type="range" id="incomeLevel1" min="0" max="120000" step="500" value="25000">
-            <div class="slider-val" id="incomeLevel1Val">£25,000</div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="secondAge">Income drops at age</label>
-          <div class="slider-row">
-            <input type="range" id="secondAge" min="66" max="90" step="1" value="75">
-            <div class="slider-val" id="secondAgeVal">75</div>
-          </div>
-        </div>
-        <div class="field">
-          <label for="incomeLevel2">Income from that age on</label>
-          <div class="slider-row">
-            <input type="range" id="incomeLevel2" min="0" max="120000" step="500" value="18000">
-            <div class="slider-val" id="incomeLevel2Val">£18,000</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- RESULTS -->
-    <div class="results-grid">
-      <div class="card chart-card">
-        <h2><span class="dot"></span>ISA + pension to retirement</h2>
-        <canvas id="growthChart" height="80"></canvas>
-        <div class="summary-grid" style="margin-top:8px;">
-          <div class="stat isa">
-            <div class="label">ISA</div>
-            <div class="value" id="statIsaAtRetirement">£0</div>
-          </div>
-          <div class="stat pension">
-            <div class="label">Pension</div>
-            <div class="value" id="statPensionAtRetirement">£0</div>
-          </div>
-          <div class="stat total">
-            <div class="label">Combined</div>
-            <div class="value" id="statCombinedAtRetirement">£0</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card chart-card">
-        <h2><span class="dot"></span>Annual spend by source</h2>
-        <canvas id="spendChart" height="80"></canvas>
-        <p class="chart-note">State Pension, DB/other income, DC pension &amp; ISA vs your target (dashed).</p>
-      </div>
-
-      <div class="card">
-        <h2><span class="dot"></span>Mortgage overpayment effect</h2>
-        <div class="summary-grid-2">
-          <div class="stat mortgage">
-            <div class="label">Baseline payoff</div>
-            <div class="value" id="statMortgageBaseline">—</div>
-          </div>
-          <div class="stat mortgage">
-            <div class="label">With extra overpayment</div>
-            <div class="value" id="statMortgageWithExtra">—</div>
-          </div>
-        </div>
-        <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
-      </div>
-
-      <div class="card chart-card">
-        <h2><span class="dot"></span>Retirement pot balance</h2>
-        <canvas id="drawdownChart" height="80"></canvas>
-        <div id="drawdownOutcome" class="outcome-box good">—</div>
-      </div>
-    </div>
-  </div>
 
   <footer>Illustrative only — not financial advice. Assumes one fixed growth rate per year (no market volatility modelled) and constant monthly ISA/pension contributions until retirement, then annual pot growth and drawdown afterwards. Nothing entered here is saved to your ISA, pension, mortgage or savings trackers.</footer>
 </div>
