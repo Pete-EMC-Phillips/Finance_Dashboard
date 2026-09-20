@@ -47,8 +47,9 @@
   header{margin-bottom:10px;}
   header h1{font-size:1.25rem;margin:0 0 2px;display:flex;align-items:center;gap:8px;}
   header p{color:var(--muted);margin:0;font-size:0.78rem;}
-  .results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:12px;align-items:start;margin-bottom:12px;}
+  .results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:12px;align-items:start;margin-bottom:12px;}
   @media (max-width: 760px){ .results-grid{grid-template-columns:1fr;} }
+  .results-col{display:flex;flex-direction:column;gap:12px;}
   .sliders-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 26px;}
   .hidden-block{display:none;}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;}
@@ -206,25 +207,27 @@
       <p class="chart-note" id="taxFreeCashCapNote"></p>
     </div>
 
-    <div class="card chart-card">
-      <h2><span class="dot"></span>Annual spend by source</h2>
-      <canvas id="spendChart" height="80"></canvas>
-      <p class="chart-note">State Pension, DB/other income, DC pension &amp; ISA vs your target (dashed).</p>
-    </div>
-
-    <div class="card">
-      <h2><span class="dot"></span>Mortgage overpayment effect</h2>
-      <div class="summary-grid-2">
-        <div class="stat mortgage">
-          <div class="label">Baseline payoff</div>
-          <div class="value" id="statMortgageBaseline">—</div>
-        </div>
-        <div class="stat mortgage">
-          <div class="label">With extra overpayment</div>
-          <div class="value" id="statMortgageWithExtra">—</div>
-        </div>
+    <div class="results-col">
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Annual spend by source</h2>
+        <canvas id="spendChart" height="80"></canvas>
+        <p class="chart-note">State Pension, DB/other income, DC pension &amp; ISA vs your target (dashed).</p>
       </div>
-      <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
+
+      <div class="card">
+        <h2><span class="dot"></span>Mortgage overpayment effect</h2>
+        <div class="summary-grid-2">
+          <div class="stat mortgage">
+            <div class="label">Baseline payoff</div>
+            <div class="value" id="statMortgageBaseline">—</div>
+          </div>
+          <div class="stat mortgage">
+            <div class="label">With extra overpayment</div>
+            <div class="value" id="statMortgageWithExtra">—</div>
+          </div>
+        </div>
+        <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
+      </div>
     </div>
   </div>
 
