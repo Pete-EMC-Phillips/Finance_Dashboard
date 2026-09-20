@@ -19,6 +19,8 @@
     });
   }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
 <style>
   :root{
     --bg:#0d1117;
@@ -71,6 +73,21 @@
     display:flex;align-items:center;gap:8px;
   }
   .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--text);}
+  .whatif-banner{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:linear-gradient(120deg, rgba(199,146,234,0.14), rgba(79,195,247,0.08));
+    border:1px solid rgba(199,146,234,0.4);
+    border-radius:var(--radius);
+    padding:18px 22px;
+    margin-bottom:22px;
+    text-decoration:none;
+    color:var(--text);
+    transition:border-color .15s;
+  }
+  .whatif-banner:hover{border-color:#c792ea;}
+  .whatif-banner h2{margin:0 0 4px;font-size:1.05rem;}
+  .whatif-banner p{margin:0;color:var(--muted);font-size:0.85rem;max-width:640px;}
+  .whatif-banner-arrow{flex-shrink:0;font-weight:700;color:#c792ea;font-size:0.9rem;white-space:nowrap;}
   .sources-grid{
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -188,6 +205,19 @@
     font-size:0.78rem;
   }
   .save-note button:hover{color:var(--deficit);border-color:var(--deficit);}
+  .snapshot-panel{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+  .snapshot-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .snapshot-header span{color:var(--muted);font-size:0.8rem;}
+  .snapshot-panel .add-btn{background:var(--isa);color:#08221b;border:none;font-weight:700;padding:8px 14px;border-radius:9px;cursor:pointer;font-size:0.82rem;white-space:nowrap;}
+  .snapshot-panel .add-btn:hover{filter:brightness(1.08);}
+  .sublist{display:flex;flex-direction:column;gap:8px;}
+  .sublist-item{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:0.85rem;}
+  .sublist-item .meta{flex:1;}
+  .sublist-item .meta b{color:var(--text);}
+  .sublist-item .meta span{color:var(--muted);display:block;font-size:0.78rem;}
+  .remove-btn{background:none;border:none;color:var(--deficit);cursor:pointer;font-size:1.1rem;line-height:1;padding:2px 6px;border-radius:6px;}
+  .remove-btn:hover{background:rgba(255,107,107,0.15);}
+  .empty-note{color:var(--muted);font-size:0.82rem;font-style:italic;}
   footer{
     text-align:center;color:var(--muted);
     font-size:0.78rem;margin-top:20px;
@@ -211,6 +241,14 @@
     <h1>📊 Finances Dashboard</h1>
     <p>Import the summary files from your ISA, pension, mortgage, budget, credit card and savings trackers to see everything in one place.</p>
   </header>
+
+  <a href="whatif_planner.html" target="_blank" rel="noopener" class="whatif-banner">
+    <div>
+      <h2>🎛️ What-If Planner</h2>
+      <p>Drag sliders on retirement age, ISA saving, mortgage overpayments and retirement income to explore scenarios — starting from your real numbers, without touching your real trackers.</p>
+    </div>
+    <span class="whatif-banner-arrow">Open →</span>
+  </a>
 
   <div class="sources-grid">
     <div class="card source-card" style="border-top-color:var(--budget);">
@@ -303,6 +341,14 @@
     <div id="timelineEmpty" class="mini-empty" style="display:none;">Import your retirement plan summary to see this chart — it defines the retirement horizon. ISA and house equity are added in on top of it.</div>
     <canvas id="netWorthTimelineChart"></canvas>
     <p style="color:var(--muted);font-size:0.78rem;text-align:center;margin:10px 0 0;">Combines ISA balance, pension pot (medium growth) and house equity year by year. ISA and mortgage figures hold flat once their own projection ends. Assumes all trackers were last updated around the same time.</p>
+
+    <div class="snapshot-panel">
+      <div class="snapshot-header">
+        <span>Log your real total net worth (from the "now" figure above) to compare against the projection</span>
+        <button id="logSnapshot" type="button" class="add-btn">📌 Log this month's net worth</button>
+      </div>
+      <div id="snapshotList" class="sublist"></div>
+    </div>
   </div>
 
   <div class="card chart-card">
@@ -347,10 +393,13 @@
   }
 
   let data = loadSaved() || {isa:null, pension:null, mortgage:null, budget:null, creditcard:null, savings:null};
+  data.netWorthSnapshots = Array.isArray(data.netWorthSnapshots) ? data.netWorthSnapshots : []; // { month:'YYYY-MM', value }
+  let lastNetWorthNow = 0; // set at the top of each render() so the "log snapshot" button always has the latest figure
 
   function saveNow(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      if(window.CloudSync) CloudSync.push('dashboard', data);
       const status = $('saveStatus');
       status.textContent = 'Saved just now in this browser.';
       clearTimeout(saveNow._t);
@@ -378,6 +427,22 @@
     if(y === 0) return m + (m===1 ? ' month' : ' months');
     if(m === 0) return y + (y===1 ? ' year' : ' years');
     return `${y}y ${m}m`;
+  }
+
+  function fmtMonthYM(ym){
+    if(!ym) return '';
+    const [y,m] = ym.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString('en-GB', {month:'short', year:'numeric'});
+  }
+
+  // prefer the ISA tracker's most recently logged real statement balance over its opening
+  // balance, so the dashboard reflects reality once you've started logging actuals
+  function isaCurrentValue(isa){
+    if(!isa) return {balance:0, isActual:false, asOf:null};
+    if(isa.latestActual && isa.latestActual.balance != null){
+      return {balance: isa.latestActual.balance, isActual:true, asOf: isa.latestActual.month};
+    }
+    return {balance: isa.startingBalance || 0, isActual:false, asOf:null};
   }
 
   // ---------- charts ----------
@@ -418,14 +483,18 @@
     netWorthTimelineChart = new Chart(tctx, {
       type:'line',
       data:{labels:[], datasets:[
-        {label:'Net worth', data:[], borderColor:'#2fd6a7', backgroundColor:'rgba(47,214,167,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5}
+        {label:'Net worth (projected)', data:[], borderColor:'#2fd6a7', backgroundColor:'rgba(47,214,167,0.15)', fill:true, tension:0.25, pointRadius:0, borderWidth:2.5},
+        {label:'Net worth (actual, logged)', data:[], borderColor:'#ffb454', backgroundColor:'#ffb454', showLine:false, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:'#ffb454', pointBorderColor:'#0d1117', pointBorderWidth:1.5, spanGaps:false}
       ]},
       options:{
         responsive:true,
         interaction:{mode:'index', intersect:false},
         plugins:{
-          legend:{display:false},
-          tooltip:{callbacks:{label:ctx => gbp(ctx.parsed.y)}}
+          legend:{position:'top', labels:{boxWidth:12, padding:16}},
+          tooltip:{
+            filter:item => item.parsed.y !== null && item.parsed.y !== undefined,
+            callbacks:{label:ctx => ctx.dataset.label + ': ' + gbp(ctx.parsed.y)}
+          }
         },
         scales:{
           x:{grid:{color:gridColor}, ticks:{maxRotation:60, minRotation:0, autoSkip:true, maxTicksLimit:20}},
@@ -656,6 +725,62 @@
     return {labels, values};
   }
 
+  // maps logged net worth snapshots onto the timeline chart's yearly labels (e.g. "2026","2027",...)
+  // — the chart only has yearly resolution, so a snapshot is plotted against the label for its calendar year
+  function snapshotValuesForLabels(labels){
+    const values = new Array(labels.length).fill(null);
+    data.netWorthSnapshots.forEach(s => {
+      const year = s.month.split('-')[0];
+      const idx = labels.indexOf(year);
+      if(idx !== -1) values[idx] = s.value;
+    });
+    return values;
+  }
+
+  function currentYM(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+
+  function renderSnapshotList(){
+    const el = $('snapshotList');
+    if(!data.netWorthSnapshots.length){
+      el.innerHTML = '<div class="empty-note">No snapshots logged yet.</div>';
+      return;
+    }
+    el.innerHTML = data.netWorthSnapshots
+      .slice()
+      .sort((a,b) => a.month.localeCompare(b.month))
+      .map(s => {
+        const realIdx = data.netWorthSnapshots.indexOf(s);
+        return `<div class="sublist-item">
+          <div class="meta"><b>${gbp(s.value)}</b><span>${fmtMonthYM(s.month)}</span></div>
+          <button class="remove-btn" data-type="snapshot" data-idx="${realIdx}">✕</button>
+        </div>`;
+      }).join('');
+  }
+
+  $('logSnapshot').addEventListener('click', () => {
+    const month = currentYM();
+    const existingIdx = data.netWorthSnapshots.findIndex(s => s.month === month);
+    if(existingIdx >= 0){
+      data.netWorthSnapshots[existingIdx].value = lastNetWorthNow;
+    } else {
+      data.netWorthSnapshots.push({month, value: lastNetWorthNow});
+    }
+    saveNow();
+    render();
+  });
+
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.remove-btn');
+    if(!btn || btn.dataset.type !== 'snapshot') return;
+    const idx = Number(btn.dataset.idx);
+    data.netWorthSnapshots.splice(idx, 1);
+    saveNow();
+    render();
+  });
+
   // ---------- import handling ----------
   function wireUpload(id, expectedTracker, key){
     $(id).addEventListener('change', (e) => {
@@ -688,9 +813,9 @@
   wireUpload('savingsUpload', 'savings', 'savings');
 
   $('clearAll').addEventListener('click', () => {
-    if(!confirm('Clear all imported tracker data from this dashboard?')) return;
-    data = {isa:null, pension:null, mortgage:null, budget:null, creditcard:null, savings:null};
-    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    if(!confirm('Clear all imported tracker data from this dashboard? (Your logged net worth snapshots are kept.)')) return;
+    data = {isa:null, pension:null, mortgage:null, budget:null, creditcard:null, savings:null, netWorthSnapshots: data.netWorthSnapshots};
+    saveNow();
     render();
   });
 
@@ -698,8 +823,9 @@
   function render(){
     const isa = data.isa, pension = data.pension, mortgage = data.mortgage, budget = data.budget, creditcard = data.creditcard, savings = data.savings;
 
+    const isaCurrent = isaCurrentValue(isa);
     $('isaStatus').innerHTML = isa
-      ? `<span class="status ok">Balance: ${gbp(isa.startingBalance)} · updated ${fmtDate(isa.exportedAt)}</span>`
+      ? `<span class="status ok">Balance: ${gbp(isaCurrent.balance)}${isaCurrent.isActual ? ' (actual, ' + fmtMonthYM(isaCurrent.asOf) + ')' : ' (opening balance)'} · updated ${fmtDate(isa.exportedAt)}</span>`
       : 'No data imported yet.';
     $('pensionStatus').innerHTML = pension
       ? `<span class="status ok">Balance: ${gbp(pension.startingBalance)} · updated ${fmtDate(pension.exportedAt)}</span>`
@@ -718,7 +844,7 @@
       : 'No data imported yet.';
 
     // net worth now / projected
-    const isaNow = isa ? isa.startingBalance : 0;
+    const isaNow = isaCurrent.balance;
     // pension "now" = live scheme balance + dormant pots (at their own last valuation) — the
     // retirement planner doesn't track a single combined "today" figure since dormant pots each
     // have their own valuation date, so this is the closest available approximation
@@ -741,6 +867,8 @@
     const anyImported = !!(isa || pension || mortgage || budget || creditcard || savings);
     $('statNetWorthNow').textContent = anyImported ? gbp(netWorthNow) : '—';
     $('statNetWorthFuture').textContent = anyImported ? gbp(netWorthFuture) : '—';
+    lastNetWorthNow = netWorthNow;
+    renderSnapshotList();
 
     if(budget){
       const leftoverCard = $('statLeftoverCard');
@@ -861,6 +989,7 @@
       $('netWorthTimelineChart').style.display = '';
       netWorthTimelineChart.data.labels = timeline.labels;
       netWorthTimelineChart.data.datasets[0].data = timeline.values;
+      netWorthTimelineChart.data.datasets[1].data = snapshotValuesForLabels(timeline.labels);
       netWorthTimelineChart.update();
     } else {
       $('timelineEmpty').style.display = '';
@@ -935,6 +1064,28 @@
 
   initCharts();
   render();
+
+  if(window.CloudSync){
+    CloudSync.onAuthChange(function(user){
+      if(!user) return;
+      CloudSync.pull('dashboard').then(function(cloudState){
+        if(cloudState){
+          data = cloudState;
+          data.netWorthSnapshots = Array.isArray(data.netWorthSnapshots) ? data.netWorthSnapshots : [];
+          render();
+        }
+        // Live-link each tracker's cloud summary straight into the dashboard —
+        // no more manual export/import once you're signed in on both ends.
+        const trackerKeys = ['isa','pension','mortgage','budget','creditcard','savings'];
+        Promise.all(trackerKeys.map(key =>
+          CloudSync.pull(key).then(summary => { if(summary) data[key] = summary; })
+        )).then(() => {
+          saveNow();
+          render();
+        });
+      });
+    });
+  }
 })();
 </script>
 </body>
