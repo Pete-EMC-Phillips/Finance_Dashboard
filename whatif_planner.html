@@ -52,6 +52,18 @@
   .card h2{font-size:1rem;margin:0 0 14px;color:var(--text);display:flex;align-items:center;gap:8px;}
   .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
   .card p.hint{color:var(--muted);font-size:0.8rem;margin:-8px 0 14px;line-height:1.5;}
+  .starting-details summary{
+    cursor:pointer;font-size:1rem;font-weight:700;color:var(--text);
+    margin:-2px 0 12px;list-style:none;
+  }
+  .starting-details summary::-webkit-details-marker{display:none;}
+  .starting-details summary::before{content:'▸ ';color:var(--accent);}
+  .starting-details[open] summary::before{content:'▾ ';}
+  .starting-details h3{
+    font-size:0.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;
+    margin:16px 0 10px;
+  }
+  .starting-details h3:first-of-type{margin-top:2px;}
   label{display:block;font-size:0.82rem;color:var(--muted);margin-bottom:6px;}
   .field{margin-bottom:14px;}
   input[type="number"]{
@@ -134,9 +146,10 @@
   <div class="layout">
     <!-- CONTROLS -->
     <div>
-      <div class="card">
-        <h2><span class="dot"></span>Starting point — savings &amp; pension</h2>
+      <details class="card starting-details">
+        <summary>⚙ Starting figures (from your trackers) — view or edit</summary>
         <p class="hint">Pulled live from your trackers when signed in and refreshed; edit any figure by hand otherwise.</p>
+        <h3>Savings &amp; pension</h3>
         <div class="row2">
           <div class="field">
             <label for="currentAge">Current age</label>
@@ -193,8 +206,7 @@
         </div>
       </div>
 
-      <div class="card">
-        <h2><span class="dot"></span>Starting point — mortgage</h2>
+        <h3>Mortgage</h3>
         <div class="row2">
           <div class="field">
             <label for="mortgageBalance">Balance left (£)</label>
@@ -215,7 +227,7 @@
             <input type="number" id="mortgageOverpayBaseline" value="0" min="0" step="10">
           </div>
         </div>
-      </div>
+      </details>
 
       <div class="card">
         <h2><span class="dot"></span>What if…?</h2>
@@ -242,10 +254,24 @@
           <p class="hint" style="margin:6px 0 0;">On top of the current overpayment above.</p>
         </div>
         <div class="field">
-          <label for="desiredIncome">Desired retirement income</label>
+          <label for="incomeLevel1">Income until the age below</label>
           <div class="slider-row">
-            <input type="range" id="desiredIncome" min="10000" max="60000" step="500" value="25000">
-            <div class="slider-val" id="desiredIncomeVal">£25,000</div>
+            <input type="range" id="incomeLevel1" min="0" max="120000" step="500" value="25000">
+            <div class="slider-val" id="incomeLevel1Val">£25,000</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="secondAge">Income drops at age</label>
+          <div class="slider-row">
+            <input type="range" id="secondAge" min="66" max="90" step="1" value="75">
+            <div class="slider-val" id="secondAgeVal">75</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="incomeLevel2">Income from that age on</label>
+          <div class="slider-row">
+            <input type="range" id="incomeLevel2" min="0" max="120000" step="500" value="18000">
+            <div class="slider-val" id="incomeLevel2Val">£18,000</div>
           </div>
         </div>
       </div>
@@ -288,8 +314,14 @@
       </div>
 
       <div class="card chart-card">
-        <h2><span class="dot"></span>Retirement income drawdown</h2>
-        <p class="hint">Combined ISA + pension pot from retirement, spent down at your desired income (topped up by the State Pension once it starts).</p>
+        <h2><span class="dot"></span>Annual spend by source</h2>
+        <p class="hint">Where each year's income comes from: State Pension (once it starts), any DB pensions/other income from your pension tracker, then your DC pension and ISA making up the rest — against your requested target (dashed line).</p>
+        <canvas id="spendChart" height="160"></canvas>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Retirement pot balance</h2>
+        <p class="hint">ISA and pension pot balances remaining each year through retirement, after that year's spending.</p>
         <canvas id="drawdownChart" height="150"></canvas>
         <div id="drawdownOutcome" class="outcome-box good">—</div>
       </div>
@@ -323,7 +355,24 @@
     'salary','employeePct','employerPct','statePension','statePensionAge',
     'mortgageBalance','mortgageRate','mortgagePayment','mortgageOverpayBaseline'
   ];
-  const SLIDER_IDS = ['retireAge','isaMonthly','mortgageExtraOverpay','desiredIncome'];
+  const SLIDER_IDS = ['retireAge','isaMonthly','mortgageExtraOverpay','incomeLevel1','secondAge','incomeLevel2'];
+
+  // Other income (DB pensions + misc other income) pulled from the pension tracker's own
+  // state, purely informational — not editable here, just folded into the "annual spend by
+  // source" chart so it doesn't get double-counted as a shortfall your ISA/pension has to cover.
+  let dbPensionSources = [];   // { name, amount, startAge }
+  let otherIncomeSources = []; // { name, amount, startAge, endAge, taxable }
+
+  function otherIncomeForAge(age){
+    let total = 0;
+    dbPensionSources.forEach(db => { if(age >= (parseFloat(db.startAge) || 0)) total += (parseFloat(db.amount) || 0); });
+    otherIncomeSources.forEach(oi => {
+      const start = parseFloat(oi.startAge) || 0;
+      const end = oi.endAge != null && oi.endAge !== '' ? parseFloat(oi.endAge) : null;
+      if(age >= start && (end == null || age <= end)) total += (parseFloat(oi.amount) || 0);
+    });
+    return total;
+  }
 
   function loadSaved(){
     try{
@@ -375,7 +424,13 @@
       if(st.employerPct != null) $('employerPct').value = st.employerPct;
       if(st.statePensionAge != null) $('statePensionAge').value = st.statePensionAge;
       if(st.planToAge != null) $('planToAge').value = st.planToAge;
-      if(st.desiredIncome != null) $('desiredIncome').value = st.desiredIncome;
+      if(st.desiredIncome != null) $('incomeLevel1').value = st.desiredIncome;
+      // your pension tracker's own "reduced income from age X" tier, if you've set one,
+      // becomes this sheet's second income level by default
+      if(st.reducedAge != null && parseFloat(st.reducedAge) > 0) $('secondAge').value = st.reducedAge;
+      if(st.reducedIncome != null && parseFloat(st.reducedIncome) > 0) $('incomeLevel2').value = st.reducedIncome;
+      dbPensionSources = Array.isArray(st.dbPensions) ? st.dbPensions : [];
+      otherIncomeSources = Array.isArray(st.otherIncome) ? st.otherIncome : [];
     }
     if(mortgage){
       if(mortgage.mortgageBalance != null) $('mortgageBalance').value = Math.round(mortgage.mortgageBalance);
@@ -423,17 +478,28 @@
     const minRetire = Math.max(Math.ceil(currentAge) + 1, 45);
     $('retireAge').min = minRetire;
     if(parseFloat($('retireAge').value) < minRetire) $('retireAge').value = minRetire;
+
+    const retireAge = parseFloat($('retireAge').value) || 65;
+    const planToAge = parseFloat($('planToAge').value) || 90;
+    const minSecond = retireAge + 1;
+    const maxSecond = Math.max(minSecond, planToAge);
+    $('secondAge').min = minSecond;
+    $('secondAge').max = maxSecond;
+    if(parseFloat($('secondAge').value) < minSecond) $('secondAge').value = minSecond;
+    if(parseFloat($('secondAge').value) > maxSecond) $('secondAge').value = maxSecond;
   }
 
   function syncSliderLabels(){
     $('retireAgeVal').textContent = $('retireAge').value;
     $('isaMonthlyVal').textContent = gbp(parseFloat($('isaMonthly').value) || 0);
     $('mortgageExtraOverpayVal').textContent = gbp(parseFloat($('mortgageExtraOverpay').value) || 0);
-    $('desiredIncomeVal').textContent = gbp(parseFloat($('desiredIncome').value) || 0);
+    $('incomeLevel1Val').textContent = gbp(parseFloat($('incomeLevel1').value) || 0);
+    $('secondAgeVal').textContent = $('secondAge').value;
+    $('incomeLevel2Val').textContent = gbp(parseFloat($('incomeLevel2').value) || 0);
   }
 
   // ---------- charts ----------
-  let growthChart, drawdownChart;
+  let growthChart, drawdownChart, spendChart;
   function initCharts(){
     const commonScales = {
       x: { ticks: { color: '#a698c4', maxRotation: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
@@ -455,12 +521,31 @@
     drawdownChart = new Chart($('drawdownChart').getContext('2d'), {
       type: 'line',
       data: { labels: [], datasets: [
-        { label: 'Combined pot', data: [], borderColor: '#c792ea', backgroundColor: 'rgba(199,146,234,0.12)', tension: 0.25, pointRadius: 0, fill: true }
+        { label: 'ISA remaining', data: [], borderColor: '#2fd6a7', backgroundColor: 'rgba(47,214,167,0.08)', tension: 0.25, pointRadius: 0, fill: true },
+        { label: 'Pension remaining', data: [], borderColor: '#f2b84b', backgroundColor: 'rgba(242,184,75,0.08)', tension: 0.25, pointRadius: 0, fill: true },
+        { label: 'Combined', data: [], borderColor: '#c792ea', borderDash: [5,4], tension: 0.25, pointRadius: 0, fill: false }
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { labels: { color: '#f0eaf9' } } },
         scales: commonScales
+      }
+    });
+    spendChart = new Chart($('spendChart').getContext('2d'), {
+      data: { labels: [], datasets: [
+        { type: 'bar', label: 'State Pension', data: [], backgroundColor: '#4fc3f7', stack: 'spend' },
+        { type: 'bar', label: 'Other income (DB / other)', data: [], backgroundColor: '#93a4bd', stack: 'spend' },
+        { type: 'bar', label: 'DC pension drawdown', data: [], backgroundColor: '#f2b84b', stack: 'spend' },
+        { type: 'bar', label: 'ISA drawdown', data: [], backgroundColor: '#2fd6a7', stack: 'spend' },
+        { type: 'line', label: 'Target income', data: [], borderColor: '#f0eaf9', borderDash: [5,4], stepped: true, pointRadius: 0, fill: false }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f0eaf9' } } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#a698c4', maxRotation: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { stacked: true, ticks: { color: '#a698c4', callback: v => '£' + (v/1000) + 'k' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        }
       }
     });
   }
@@ -558,34 +643,84 @@
     // ---- retirement income drawdown ----
     const statePensionAnnual = parseFloat($('statePension').value) || 0;
     const statePensionAge = parseFloat($('statePensionAge').value) || 67;
-    const desiredIncome = parseFloat($('desiredIncome').value) || 0;
+    const incomeLevel1 = parseFloat($('incomeLevel1').value) || 0;
+    const incomeLevel2 = parseFloat($('incomeLevel2').value) || 0;
+    const secondAge = parseFloat($('secondAge').value) || (Math.round(retireAge) + 10);
 
-    let pot = isaBal + pensionBal;
-    const drawAges = [Math.round(retireAge)];
-    const drawSeries = [Math.round(pot)];
+    let drawIsaBal = isaBal, drawPensionBal = pensionBal;
+    const rAge = Math.round(retireAge);
+
+    const drawAges = [rAge];
+    const drawIsaSeries = [Math.round(drawIsaBal)];
+    const drawPensionSeries = [Math.round(drawPensionBal)];
+    const drawCombinedSeries = [Math.round(drawIsaBal + drawPensionBal)];
+
+    const spendAges = [], spendSP = [], spendOther = [], spendPension = [], spendIsa = [], spendTarget = [];
     let depletionAge = null;
+    let lastCombined = drawIsaBal + drawPensionBal;
 
-    for(let age = Math.round(retireAge) + 1; age <= planToAge; age++){
+    for(let age = rAge; age <= planToAge; age++){
+      const target = age < secondAge ? incomeLevel1 : incomeLevel2;
       const spThisYear = age >= statePensionAge ? statePensionAnnual : 0;
-      const neededFromPot = Math.max(0, desiredIncome - spThisYear);
-      pot = pot * (1 + pensionGrowthPct / 100) - neededFromPot;
-      if(pot < 0) pot = 0;
-      drawAges.push(age);
-      drawSeries.push(Math.round(pot));
-      if(pot <= 0 && depletionAge === null) depletionAge = age;
+      const otherThisYear = otherIncomeForAge(age);
+      let neededFromPots = Math.max(0, target - spThisYear - otherThisYear);
+
+      const totalPots = drawIsaBal + drawPensionBal;
+      let isaDraw = 0, pensionDraw = 0;
+      if(totalPots > 0 && neededFromPots > 0){
+        const isaShare = drawIsaBal / totalPots;
+        isaDraw = Math.min(drawIsaBal, neededFromPots * isaShare);
+        pensionDraw = Math.min(drawPensionBal, neededFromPots - isaDraw);
+        const shortfall = neededFromPots - isaDraw - pensionDraw;
+        if(shortfall > 0.01 && drawIsaBal - isaDraw > 0){
+          isaDraw += Math.min(drawIsaBal - isaDraw, shortfall);
+        }
+      }
+
+      spendAges.push(age);
+      spendSP.push(Math.round(spThisYear));
+      spendOther.push(Math.round(otherThisYear));
+      spendPension.push(Math.round(pensionDraw));
+      spendIsa.push(Math.round(isaDraw));
+      spendTarget.push(Math.round(target));
+
+      drawIsaBal = Math.max(0, drawIsaBal - isaDraw) * (1 + isaGrowthPct / 100);
+      drawPensionBal = Math.max(0, drawPensionBal - pensionDraw) * (1 + pensionGrowthPct / 100);
+      lastCombined = drawIsaBal + drawPensionBal;
+
+      if(age > rAge){
+        drawAges.push(age);
+        drawIsaSeries.push(Math.round(drawIsaBal));
+        drawPensionSeries.push(Math.round(drawPensionBal));
+        drawCombinedSeries.push(Math.round(lastCombined));
+      }
+      if(lastCombined <= 0 && depletionAge === null) depletionAge = age;
     }
 
     drawdownChart.data.labels = drawAges.map(a => 'Age ' + a);
-    drawdownChart.data.datasets[0].data = drawSeries;
+    drawdownChart.data.datasets[0].data = drawIsaSeries;
+    drawdownChart.data.datasets[1].data = drawPensionSeries;
+    drawdownChart.data.datasets[2].data = drawCombinedSeries;
     drawdownChart.update();
 
+    spendChart.data.labels = spendAges.map(a => 'Age ' + a);
+    spendChart.data.datasets[0].data = spendSP;
+    spendChart.data.datasets[1].data = spendOther;
+    spendChart.data.datasets[2].data = spendPension;
+    spendChart.data.datasets[3].data = spendIsa;
+    spendChart.data.datasets[4].data = spendTarget;
+    spendChart.update();
+
     const outcomeEl = $('drawdownOutcome');
+    const incomeSummary = secondAge <= planToAge
+      ? `${gbp(incomeLevel1)}/yr until age ${Math.round(secondAge)}, then ${gbp(incomeLevel2)}/yr`
+      : `${gbp(incomeLevel1)}/yr`;
     if(depletionAge !== null){
       outcomeEl.className = 'outcome-box warn';
-      outcomeEl.textContent = `⚠ At ${gbp(desiredIncome)}/yr, the pot runs out at age ${depletionAge} — ${planToAge - depletionAge} year(s) before your "plan to" age of ${planToAge}.`;
+      outcomeEl.textContent = `⚠ At ${incomeSummary}, the combined pot runs out at age ${depletionAge} — ${planToAge - depletionAge} year(s) before your "plan to" age of ${planToAge}.`;
     } else {
       outcomeEl.className = 'outcome-box good';
-      outcomeEl.textContent = `✓ At ${gbp(desiredIncome)}/yr, the pot lasts to age ${planToAge} with an estimated ${gbp(pot)} left over.`;
+      outcomeEl.textContent = `✓ At ${incomeSummary}, the combined pot lasts to age ${planToAge} with an estimated ${gbp(lastCombined)} left over.`;
     }
 
     saveNow();
