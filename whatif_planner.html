@@ -28,6 +28,7 @@
     --pension:#f2b84b;
     --total:#c792ea;
     --mortgage:#4fc3f7;
+    --cash:#ff8a65;
     --warn:#ffb454;
     --danger:#ff6b6b;
     --good:#2fd6a7;
@@ -104,7 +105,7 @@
     font-size:0.75rem;margin-bottom:8px;padding:4px 10px;border:1px solid var(--border);border-radius:8px;
   }
   .back-link:hover{color:var(--accent);border-color:var(--accent);}
-  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px;}
+  .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;}
   @media (max-width: 760px){ .summary-grid{grid-template-columns:1fr;} }
   .summary-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:4px;}
   @media (max-width: 760px){ .summary-grid-2{grid-template-columns:1fr;} }
@@ -115,6 +116,7 @@
   .stat.pension .value{color:var(--pension);}
   .stat.total .value{color:var(--total);}
   .stat.mortgage .value{color:var(--mortgage);}
+  .stat.cash .value{color:var(--cash);}
   .chart-card canvas{max-height:190px;}
   .chart-note{color:var(--muted);font-size:0.72rem;margin:6px 0 0;text-align:center;}
   .note-box{
@@ -164,9 +166,14 @@
           <div class="label">Combined at retirement</div>
           <div class="value" id="statCombinedAtRetirement">£0</div>
         </div>
+        <div class="stat cash">
+          <div class="label">Tax-free cash taken</div>
+          <div class="value" id="statTaxFreeCash">£0</div>
+        </div>
       </div>
       <div id="drawdownOutcome" class="outcome-box good" style="margin-top:8px;">—</div>
-      <p class="chart-note">Solid line = saving up; dashed = spending down from retirement age onward.</p>
+      <p class="chart-note">Solid line = saving up; dashed = spending down from retirement age onward. Pension figures are shown after any tax-free cash is taken.</p>
+      <p class="chart-note" id="taxFreeCashCapNote"></p>
     </div>
 
     <div class="card chart-card">
@@ -237,6 +244,13 @@
           <div class="slider-val" id="incomeLevel2Val">£18,000</div>
         </div>
       </div>
+      <div class="field">
+        <label for="taxFreeCash">Tax-free cash withdrawn at retirement</label>
+        <div class="slider-row">
+          <input type="range" id="taxFreeCash" min="0" max="0" step="500" value="0">
+          <div class="slider-val" id="taxFreeCashVal">£0</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -298,6 +312,13 @@
             <input type="number" id="statePensionAge" value="67" min="60" max="75" step="1">
           </div>
         </div>
+        <div class="row2">
+          <div class="field">
+            <label for="dbCashTaken">Tax-free cash already taken elsewhere (£)</label>
+            <input type="number" id="dbCashTaken" value="0" min="0" step="500">
+          </div>
+        </div>
+        <p class="hint">E.g. a tax-free lump sum already drawn from a DB scheme. This eats into your £268,275 UK lifetime lump sum allowance, reducing how much tax-free cash you can still take from your DC pot below.</p>
 
         <div class="hidden-block">
           <h3>Mortgage</h3>
@@ -348,10 +369,11 @@
   // ---------- persistence (local only — this is a sandbox, not synced across devices) ----------
   const STARTING_IDS = [
     'currentAge','planToAge','isaBalance','isaGrowth','pensionPot','pensionGrowth',
-    'salary','employeePct','employerPct','statePension','statePensionAge',
+    'salary','employeePct','employerPct','statePension','statePensionAge','dbCashTaken',
     'mortgageBalance','mortgageRate','mortgagePayment','mortgageOverpayBaseline'
   ];
-  const SLIDER_IDS = ['retireAge','isaMonthly','mortgageExtraOverpay','incomeLevel1','secondAge','incomeLevel2'];
+  const SLIDER_IDS = ['retireAge','isaMonthly','mortgageExtraOverpay','incomeLevel1','secondAge','incomeLevel2','taxFreeCash'];
+  const LSA = 268275; // UK Lump Sum Allowance (2026/27) — total tax-free pension cash you can ever take, across all schemes
 
   // Other income (DB pensions + misc other income) pulled from the pension tracker's own
   // state, purely informational — not editable here, just folded into the "annual spend by
@@ -492,6 +514,7 @@
     $('incomeLevel1Val').textContent = gbp(parseFloat($('incomeLevel1').value) || 0);
     $('secondAgeVal').textContent = $('secondAge').value;
     $('incomeLevel2Val').textContent = gbp(parseFloat($('incomeLevel2').value) || 0);
+    $('taxFreeCashVal').textContent = gbp(parseFloat($('taxFreeCash').value) || 0);
   }
 
   // ---------- charts ----------
@@ -596,9 +619,30 @@
 
     const retireIndex = ages.length - 1; // last point of the accumulation phase = first point of drawdown
 
+    // ---- tax-free cash (PCLS) withdrawn from the DC pension at retirement ----
+    // UK rules: up to 25% of the pot, but never more than the Lump Sum Allowance (£268,275,
+    // 2026/27) minus any tax-free cash already taken elsewhere (e.g. a DB scheme lump sum).
+    const dbCashTaken = parseFloat($('dbCashTaken').value) || 0;
+    const lsaRemaining = Math.max(0, LSA - dbCashTaken);
+    const maxTaxFreeCash = Math.max(0, Math.min(pensionBal * 0.25, lsaRemaining));
+    const taxFreeCashSlider = $('taxFreeCash');
+    taxFreeCashSlider.max = Math.round(maxTaxFreeCash);
+    if(parseFloat(taxFreeCashSlider.value) > maxTaxFreeCash) taxFreeCashSlider.value = Math.round(maxTaxFreeCash);
+    const taxFreeCashWithdrawn = Math.min(parseFloat(taxFreeCashSlider.value) || 0, maxTaxFreeCash);
+    $('taxFreeCashVal').textContent = gbp(taxFreeCashWithdrawn);
+
+    pensionBal -= taxFreeCashWithdrawn; // cash comes out of the pot tax-free; the rest funds drawdown as normal
+    // the accumulation-phase chart point at the retirement age should reflect the pot *after* cash is taken
+    pensionSeries[retireIndex] = Math.round(pensionBal);
+    totalSeries[retireIndex] = Math.round(isaBal + pensionBal);
+
     $('statIsaAtRetirement').textContent = gbp(isaBal);
     $('statPensionAtRetirement').textContent = gbp(pensionBal);
     $('statCombinedAtRetirement').textContent = gbp(isaBal + pensionBal);
+    $('statTaxFreeCash').textContent = gbp(taxFreeCashWithdrawn);
+    $('taxFreeCashCapNote').textContent = maxTaxFreeCash > 0
+      ? `Capped at ${gbp(maxTaxFreeCash)} — the lower of 25% of your DC pot and your remaining £268,275 lifetime allowance${dbCashTaken > 0 ? ` (after ${gbp(dbCashTaken)} already taken elsewhere)` : ''}.`
+      : 'No tax-free cash available — your remaining lifetime allowance is £0.';
 
     // ---- mortgage overpayment effect ----
     const mortBalance = parseFloat($('mortgageBalance').value) || 0;
