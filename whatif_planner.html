@@ -149,22 +149,24 @@
   <!-- RESULTS -->
   <div class="results-grid">
     <div class="card chart-card">
-      <h2><span class="dot"></span>ISA + pension to retirement</h2>
+      <h2><span class="dot"></span>ISA + pension — growth, then drawdown</h2>
       <canvas id="growthChart" height="80"></canvas>
       <div class="summary-grid" style="margin-top:8px;">
         <div class="stat isa">
-          <div class="label">ISA</div>
+          <div class="label">ISA at retirement</div>
           <div class="value" id="statIsaAtRetirement">£0</div>
         </div>
         <div class="stat pension">
-          <div class="label">Pension</div>
+          <div class="label">Pension at retirement</div>
           <div class="value" id="statPensionAtRetirement">£0</div>
         </div>
         <div class="stat total">
-          <div class="label">Combined</div>
+          <div class="label">Combined at retirement</div>
           <div class="value" id="statCombinedAtRetirement">£0</div>
         </div>
       </div>
+      <div id="drawdownOutcome" class="outcome-box good" style="margin-top:8px;">—</div>
+      <p class="chart-note">Solid line = saving up; dashed = spending down from retirement age onward.</p>
     </div>
 
     <div class="card chart-card">
@@ -186,12 +188,6 @@
         </div>
       </div>
       <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
-    </div>
-
-    <div class="card chart-card">
-      <h2><span class="dot"></span>Retirement pot balance</h2>
-      <canvas id="drawdownChart" height="80"></canvas>
-      <div id="drawdownOutcome" class="outcome-box good">—</div>
     </div>
   </div>
 
@@ -302,7 +298,6 @@
             <input type="number" id="statePensionAge" value="67" min="60" max="75" step="1">
           </div>
         </div>
-      </div>
 
         <div class="hidden-block">
           <h3>Mortgage</h3>
@@ -500,7 +495,8 @@
   }
 
   // ---------- charts ----------
-  let growthChart, drawdownChart, spendChart;
+  let growthChart, spendChart;
+  let currentRetireIndex = 0; // index in growthChart's labels where accumulation ends and drawdown begins — updated every compute()
   function initCharts(){
     const tickFont = { size: 9 };
     const legendOpts = { labels: { color: '#f0eaf9', font: { size: 9 }, boxWidth: 10, boxHeight: 10, padding: 6 } };
@@ -508,24 +504,14 @@
       x: { ticks: { color: '#a698c4', maxRotation: 0, font: tickFont }, grid: { color: 'rgba(255,255,255,0.05)' } },
       y: { ticks: { color: '#a698c4', font: tickFont, callback: v => '£' + (v/1000) + 'k' }, grid: { color: 'rgba(255,255,255,0.05)' } }
     };
+    // Post-retirement portion of each line is dashed (via Chart.js segment styling) so the
+    // single continuous line still shows the switch from saving up to spending down.
+    const dashAfterRetirement = ctx => ctx.p0DataIndex >= currentRetireIndex ? [5,4] : undefined;
     growthChart = new Chart($('growthChart').getContext('2d'), {
       type: 'line',
       data: { labels: [], datasets: [
-        { label: 'ISA', data: [], borderColor: '#2fd6a7', backgroundColor: 'rgba(47,214,167,0.08)', tension: 0.25, pointRadius: 0, fill: true },
-        { label: 'Pension', data: [], borderColor: '#f2b84b', backgroundColor: 'rgba(242,184,75,0.08)', tension: 0.25, pointRadius: 0, fill: true },
-        { label: 'Combined', data: [], borderColor: '#c792ea', borderDash: [5,4], tension: 0.25, pointRadius: 0, fill: false }
-      ]},
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: legendOpts },
-        scales: commonScales
-      }
-    });
-    drawdownChart = new Chart($('drawdownChart').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: [
-        { label: 'ISA remaining', data: [], borderColor: '#2fd6a7', backgroundColor: 'rgba(47,214,167,0.08)', tension: 0.25, pointRadius: 0, fill: true },
-        { label: 'Pension remaining', data: [], borderColor: '#f2b84b', backgroundColor: 'rgba(242,184,75,0.08)', tension: 0.25, pointRadius: 0, fill: true },
+        { label: 'ISA', data: [], borderColor: '#2fd6a7', backgroundColor: 'rgba(47,214,167,0.08)', tension: 0.25, pointRadius: 0, fill: true, segment: { borderDash: dashAfterRetirement } },
+        { label: 'Pension', data: [], borderColor: '#f2b84b', backgroundColor: 'rgba(242,184,75,0.08)', tension: 0.25, pointRadius: 0, fill: true, segment: { borderDash: dashAfterRetirement } },
         { label: 'Combined', data: [], borderColor: '#c792ea', borderDash: [5,4], tension: 0.25, pointRadius: 0, fill: false }
       ]},
       options: {
@@ -608,11 +594,7 @@
       }
     }
 
-    growthChart.data.labels = ages.map(a => 'Age ' + a);
-    growthChart.data.datasets[0].data = isaSeries;
-    growthChart.data.datasets[1].data = pensionSeries;
-    growthChart.data.datasets[2].data = totalSeries;
-    growthChart.update();
+    const retireIndex = ages.length - 1; // last point of the accumulation phase = first point of drawdown
 
     $('statIsaAtRetirement').textContent = gbp(isaBal);
     $('statPensionAtRetirement').textContent = gbp(pensionBal);
@@ -653,11 +635,6 @@
     let drawIsaBal = isaBal, drawPensionBal = pensionBal;
     const rAge = Math.round(retireAge);
 
-    const drawAges = [rAge];
-    const drawIsaSeries = [Math.round(drawIsaBal)];
-    const drawPensionSeries = [Math.round(drawPensionBal)];
-    const drawCombinedSeries = [Math.round(drawIsaBal + drawPensionBal)];
-
     const spendAges = [], spendSP = [], spendOther = [], spendPension = [], spendIsa = [], spendTarget = [];
     let depletionAge = null;
     let lastCombined = drawIsaBal + drawPensionBal;
@@ -692,19 +669,20 @@
       lastCombined = drawIsaBal + drawPensionBal;
 
       if(age > rAge){
-        drawAges.push(age);
-        drawIsaSeries.push(Math.round(drawIsaBal));
-        drawPensionSeries.push(Math.round(drawPensionBal));
-        drawCombinedSeries.push(Math.round(lastCombined));
+        ages.push(age);
+        isaSeries.push(Math.round(drawIsaBal));
+        pensionSeries.push(Math.round(drawPensionBal));
+        totalSeries.push(Math.round(lastCombined));
       }
       if(lastCombined <= 0 && depletionAge === null) depletionAge = age;
     }
 
-    drawdownChart.data.labels = drawAges.map(a => 'Age ' + a);
-    drawdownChart.data.datasets[0].data = drawIsaSeries;
-    drawdownChart.data.datasets[1].data = drawPensionSeries;
-    drawdownChart.data.datasets[2].data = drawCombinedSeries;
-    drawdownChart.update();
+    currentRetireIndex = retireIndex;
+    growthChart.data.labels = ages.map(a => 'Age ' + a);
+    growthChart.data.datasets[0].data = isaSeries;
+    growthChart.data.datasets[1].data = pensionSeries;
+    growthChart.data.datasets[2].data = totalSeries;
+    growthChart.update();
 
     spendChart.data.labels = spendAges.map(a => 'Age ' + a);
     spendChart.data.datasets[0].data = spendSP;
