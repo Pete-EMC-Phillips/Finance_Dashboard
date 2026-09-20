@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What-If Planner</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
+<style>
+  :root{
+    --bg:#150e1e;
+    --panel:#1e1530;
+    --panel-2:#261c3d;
+    --border:#3a2b57;
+    --text:#f0eaf9;
+    --muted:#a698c4;
+    --accent:#c792ea;
+    --accent-2:#4fc3f7;
+    --isa:#2fd6a7;
+    --pension:#f2b84b;
+    --total:#c792ea;
+    --mortgage:#4fc3f7;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --good:#2fd6a7;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #2a1c45 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1280px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  header h1{font-size:1.7rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;}
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .layout{display:grid;grid-template-columns:400px 1fr;gap:20px;align-items:start;}
+  @media (max-width: 960px){ .layout{grid-template-columns:1fr;} }
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px;}
+  .card h2{font-size:1rem;margin:0 0 14px;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card p.hint{color:var(--muted);font-size:0.8rem;margin:-8px 0 14px;line-height:1.5;}
+  label{display:block;font-size:0.82rem;color:var(--muted);margin-bottom:6px;}
+  .field{margin-bottom:14px;}
+  input[type="number"]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:9px 11px;border-radius:9px;font-size:0.95rem;outline:none;
+  }
+  input[type="number"]:focus{border-color:var(--accent);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .slider-row{display:flex;align-items:center;gap:12px;}
+  input[type="range"]{
+    flex:1;-webkit-appearance:none;height:6px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer;
+  }
+  .slider-val{min-width:96px;text-align:right;font-weight:700;font-size:1rem;color:var(--accent);}
+  .slider-minmax{display:flex;justify-content:space-between;color:var(--muted);font-size:0.72rem;margin-top:4px;}
+  .refresh-note{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    color:var(--muted);font-size:0.78rem;margin-bottom:18px;
+  }
+  .refresh-note button{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;
+  }
+  .refresh-note button:hover{color:var(--accent);border-color:var(--accent);}
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;
+    font-size:0.85rem;margin-bottom:14px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;
+  }
+  .back-link:hover{color:var(--accent);border-color:var(--accent);}
+  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px;}
+  @media (max-width: 760px){ .summary-grid{grid-template-columns:1fr;} }
+  .summary-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:6px;}
+  @media (max-width: 760px){ .summary-grid-2{grid-template-columns:1fr;} }
+  .stat{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .stat .label{color:var(--muted);font-size:0.78rem;margin-bottom:6px;}
+  .stat .value{font-size:1.25rem;font-weight:700;}
+  .stat.isa .value{color:var(--isa);}
+  .stat.pension .value{color:var(--pension);}
+  .stat.total .value{color:var(--total);}
+  .stat.mortgage .value{color:var(--mortgage);}
+  .chart-card canvas{max-height:340px;}
+  .chart-note{color:var(--muted);font-size:0.8rem;margin:10px 0 0;text-align:center;}
+  .note-box{
+    background:rgba(199,146,234,0.10);border:1px solid rgba(199,146,234,0.35);color:var(--muted);
+    padding:12px 14px;border-radius:10px;font-size:0.82rem;margin-bottom:16px;line-height:1.5;
+  }
+  .outcome-box{
+    padding:14px 16px;border-radius:10px;font-size:0.9rem;margin-top:14px;line-height:1.5;font-weight:600;
+  }
+  .outcome-box.good{background:rgba(47,214,167,0.12);border:1px solid rgba(47,214,167,0.4);color:var(--good);}
+  .outcome-box.warn{background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.4);color:var(--danger);}
+  footer{text-align:center;color:var(--muted);font-size:0.78rem;margin-top:20px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
+    <h1>🎛️ What-If Planner</h1>
+    <p>Drag the sliders to see how retirement age, ISA saving, mortgage overpayments and your target retirement income play off each other — without changing anything in your real trackers.</p>
+  </header>
+
+  <div class="refresh-note">
+    <span id="refreshedAt">Not yet pulled from your trackers — sign in above, then refresh, or just edit the starting figures below by hand.</span>
+    <button id="refreshBtn" type="button">↻ Refresh from trackers</button>
+  </div>
+
+  <div class="note-box">
+    This is a sandbox: it starts from your real numbers but nothing you do here is saved back to your ISA, pension, mortgage or savings trackers. It assumes one fixed growth rate per year rather than real market ups and downs — a future update will add a probability-based (Monte Carlo) view alongside this one.
+  </div>
+
+  <div class="layout">
+    <!-- CONTROLS -->
+    <div>
+      <div class="card">
+        <h2><span class="dot"></span>Starting point — savings &amp; pension</h2>
+        <p class="hint">Pulled live from your trackers when signed in and refreshed; edit any figure by hand otherwise.</p>
+        <div class="row2">
+          <div class="field">
+            <label for="currentAge">Current age</label>
+            <input type="number" id="currentAge" value="35" min="16" max="80" step="1">
+          </div>
+          <div class="field">
+            <label for="planToAge">Plan to age</label>
+            <input type="number" id="planToAge" value="90" min="70" max="105" step="1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="isaBalance">ISA balance now (£)</label>
+            <input type="number" id="isaBalance" value="10000" min="0" step="500">
+          </div>
+          <div class="field">
+            <label for="isaGrowth">ISA growth (%/yr)</label>
+            <input type="number" id="isaGrowth" value="6" min="0" max="20" step="0.1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="pensionPot">Pension pot now (£)</label>
+            <input type="number" id="pensionPot" value="20000" min="0" step="500">
+          </div>
+          <div class="field">
+            <label for="pensionGrowth">Pension growth (%/yr)</label>
+            <input type="number" id="pensionGrowth" value="5" min="0" max="20" step="0.1">
+          </div>
+        </div>
+        <div class="row3">
+          <div class="field">
+            <label for="salary">Salary (£/yr)</label>
+            <input type="number" id="salary" value="35000" min="0" step="500">
+          </div>
+          <div class="field">
+            <label for="employeePct">Your %</label>
+            <input type="number" id="employeePct" value="5" min="0" max="100" step="0.5">
+          </div>
+          <div class="field">
+            <label for="employerPct">Employer %</label>
+            <input type="number" id="employerPct" value="3" min="0" max="100" step="0.5">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="statePension">State Pension (£/yr)</label>
+            <input type="number" id="statePension" value="12548" min="0" step="50">
+          </div>
+          <div class="field">
+            <label for="statePensionAge">State Pension age</label>
+            <input type="number" id="statePensionAge" value="67" min="60" max="75" step="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot"></span>Starting point — mortgage</h2>
+        <div class="row2">
+          <div class="field">
+            <label for="mortgageBalance">Balance left (£)</label>
+            <input type="number" id="mortgageBalance" value="200000" min="0" step="1000">
+          </div>
+          <div class="field">
+            <label for="mortgageRate">Interest rate (%)</label>
+            <input type="number" id="mortgageRate" value="4.24" min="0" max="15" step="0.01">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="mortgagePayment">Monthly payment (£)</label>
+            <input type="number" id="mortgagePayment" value="1100" min="0" step="10">
+          </div>
+          <div class="field">
+            <label for="mortgageOverpayBaseline">Current overpayment (£/mo)</label>
+            <input type="number" id="mortgageOverpayBaseline" value="0" min="0" step="10">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot"></span>What if…?</h2>
+        <div class="field">
+          <label for="retireAge">Retirement age</label>
+          <div class="slider-row">
+            <input type="range" id="retireAge" min="45" max="75" step="1" value="65">
+            <div class="slider-val" id="retireAgeVal">65</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="isaMonthly">ISA monthly contribution</label>
+          <div class="slider-row">
+            <input type="range" id="isaMonthly" min="0" max="3000" step="10" value="150">
+            <div class="slider-val" id="isaMonthlyVal">£150</div>
+          </div>
+        </div>
+        <div class="field">
+          <label for="mortgageExtraOverpay">Extra mortgage overpayment</label>
+          <div class="slider-row">
+            <input type="range" id="mortgageExtraOverpay" min="0" max="1000" step="10" value="0">
+            <div class="slider-val" id="mortgageExtraOverpayVal">£0</div>
+          </div>
+          <p class="hint" style="margin:6px 0 0;">On top of the current overpayment above.</p>
+        </div>
+        <div class="field">
+          <label for="desiredIncome">Desired retirement income</label>
+          <div class="slider-row">
+            <input type="range" id="desiredIncome" min="10000" max="60000" step="500" value="25000">
+            <div class="slider-val" id="desiredIncomeVal">£25,000</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div>
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Cumulative ISA + pension to retirement</h2>
+        <canvas id="growthChart" height="150"></canvas>
+        <div class="summary-grid" style="margin-top:16px;">
+          <div class="stat isa">
+            <div class="label">ISA at retirement</div>
+            <div class="value" id="statIsaAtRetirement">£0</div>
+          </div>
+          <div class="stat pension">
+            <div class="label">Pension at retirement</div>
+            <div class="value" id="statPensionAtRetirement">£0</div>
+          </div>
+          <div class="stat total">
+            <div class="label">Combined</div>
+            <div class="value" id="statCombinedAtRetirement">£0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="dot"></span>Mortgage overpayment effect</h2>
+        <div class="summary-grid-2">
+          <div class="stat mortgage">
+            <div class="label">Baseline payoff</div>
+            <div class="value" id="statMortgageBaseline">—</div>
+          </div>
+          <div class="stat mortgage">
+            <div class="label">With extra overpayment</div>
+            <div class="value" id="statMortgageWithExtra">—</div>
+          </div>
+        </div>
+        <p class="chart-note" id="mortgageSavedNote">Move the "extra mortgage overpayment" slider to see the effect.</p>
+      </div>
+
+      <div class="card chart-card">
+        <h2><span class="dot"></span>Retirement income drawdown</h2>
+        <p class="hint">Combined ISA + pension pot from retirement, spent down at your desired income (topped up by the State Pension once it starts).</p>
+        <canvas id="drawdownChart" height="150"></canvas>
+        <div id="drawdownOutcome" class="outcome-box good">—</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Illustrative only — not financial advice. Assumes one fixed growth rate per year (no market volatility modelled) and constant monthly ISA/pension contributions until retirement, then annual pot growth and drawdown afterwards. Nothing entered here is saved to your ISA, pension, mortgage or savings trackers.</footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const STORAGE_KEY = 'whatifPlanner.state.v1';
+
+  function gbp(n, decimals){
+    if(n == null || isNaN(n)) return '—';
+    return n.toLocaleString('en-GB', {style:'currency', currency:'GBP', maximumFractionDigits: decimals || 0});
+  }
+
+  function fmtYM(months){
+    if(months == null || isNaN(months)) return '—';
+    const y = Math.floor(months / 12), m = Math.round(months % 12);
+    if(y <= 0) return `${m} month${m===1?'':'s'}`;
+    if(m === 0) return `${y} year${y===1?'':'s'}`;
+    return `${y}y ${m}m`;
+  }
+
+  // ---------- persistence (local only — this is a sandbox, not synced across devices) ----------
+  const STARTING_IDS = [
+    'currentAge','planToAge','isaBalance','isaGrowth','pensionPot','pensionGrowth',
+    'salary','employeePct','employerPct','statePension','statePensionAge',
+    'mortgageBalance','mortgageRate','mortgagePayment','mortgageOverpayBaseline'
+  ];
+  const SLIDER_IDS = ['retireAge','isaMonthly','mortgageExtraOverpay','desiredIncome'];
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  function saveNow(){
+    try{
+      const state = {};
+      STARTING_IDS.concat(SLIDER_IDS).forEach(id => { state[id] = $(id).value; });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){ /* localStorage unavailable */ }
+  }
+
+  function applyState(saved){
+    if(!saved) return;
+    STARTING_IDS.concat(SLIDER_IDS).forEach(id => {
+      if(saved[id] != null && $(id)) $(id).value = saved[id];
+    });
+  }
+
+  applyState(loadSaved());
+
+  // ---------- pulling live starting data from the other trackers ----------
+  function isaCurrentValue(isa){
+    if(!isa) return null;
+    if(isa.latestActual && isa.latestActual.balance != null) return isa.latestActual.balance;
+    return isa.startingBalance != null ? isa.startingBalance : null;
+  }
+
+  function applyLiveData(isa, pension, mortgage, savings){
+    if(isa){
+      const bal = isaCurrentValue(isa);
+      if(bal != null) $('isaBalance').value = Math.round(bal);
+      if(isa.growthRatePct != null) $('isaGrowth').value = isa.growthRatePct;
+      if(isa.monthlyContribution != null) $('isaMonthly').value = Math.round(isa.monthlyContribution);
+    }
+    if(pension){
+      if(pension.currentAge != null) $('currentAge').value = Math.round(pension.currentAge);
+      if(pension.startingBalance != null) $('pensionPot').value = Math.round(pension.startingBalance);
+      if(pension.retireAge != null) $('retireAge').value = pension.retireAge;
+      if(pension.statePensionAnnual != null) $('statePension').value = Math.round(pension.statePensionAnnual);
+      const st = pension.state || {};
+      if(st.medGrowth != null) $('pensionGrowth').value = st.medGrowth;
+      if(st.salary != null) $('salary').value = st.salary;
+      if(st.employeePct != null) $('employeePct').value = st.employeePct;
+      if(st.employerPct != null) $('employerPct').value = st.employerPct;
+      if(st.statePensionAge != null) $('statePensionAge').value = st.statePensionAge;
+      if(st.planToAge != null) $('planToAge').value = st.planToAge;
+      if(st.desiredIncome != null) $('desiredIncome').value = st.desiredIncome;
+    }
+    if(mortgage){
+      if(mortgage.mortgageBalance != null) $('mortgageBalance').value = Math.round(mortgage.mortgageBalance);
+      if(mortgage.ratePct != null) $('mortgageRate').value = mortgage.ratePct;
+      const payment = mortgage.actualPayment != null ? mortgage.actualPayment : mortgage.calculatedPayment;
+      if(payment != null) $('mortgagePayment').value = Math.round(payment);
+      if(mortgage.overpayment != null) $('mortgageOverpayBaseline').value = mortgage.overpayment;
+    }
+    void savings; // informational only for now — not wired into a field
+    refreshSliderBounds();
+    syncSliderLabels();
+    saveNow();
+    compute();
+  }
+
+  function pullLiveData(){
+    if(!window.CloudSync || !CloudSync.isSignedIn()){
+      $('refreshedAt').textContent = 'Sign in above to pull your live numbers, or just edit the starting figures by hand.';
+      return;
+    }
+    $('refreshedAt').textContent = 'Refreshing…';
+    Promise.all([
+      CloudSync.pull('isa'), CloudSync.pull('pension'), CloudSync.pull('mortgage'), CloudSync.pull('savings')
+    ]).then(([isa, pension, mortgage, savings]) => {
+      if(!isa && !pension && !mortgage && !savings){
+        $('refreshedAt').textContent = "Signed in, but nothing's synced from your trackers yet — open each one once while signed in first.";
+        return;
+      }
+      applyLiveData(isa, pension, mortgage, savings);
+      $('refreshedAt').textContent = 'Pulled live from your trackers just now — refresh again after you update one.';
+    });
+  }
+
+  $('refreshBtn').addEventListener('click', pullLiveData);
+
+  if(window.CloudSync){
+    CloudSync.onAuthChange(function(user){
+      if(user) pullLiveData();
+    });
+  }
+
+  // ---------- sliders ----------
+  function refreshSliderBounds(){
+    const currentAge = parseFloat($('currentAge').value) || 30;
+    const minRetire = Math.max(Math.ceil(currentAge) + 1, 45);
+    $('retireAge').min = minRetire;
+    if(parseFloat($('retireAge').value) < minRetire) $('retireAge').value = minRetire;
+  }
+
+  function syncSliderLabels(){
+    $('retireAgeVal').textContent = $('retireAge').value;
+    $('isaMonthlyVal').textContent = gbp(parseFloat($('isaMonthly').value) || 0);
+    $('mortgageExtraOverpayVal').textContent = gbp(parseFloat($('mortgageExtraOverpay').value) || 0);
+    $('desiredIncomeVal').textContent = gbp(parseFloat($('desiredIncome').value) || 0);
+  }
+
+  // ---------- charts ----------
+  let growthChart, drawdownChart;
+  function initCharts(){
+    const commonScales = {
+      x: { ticks: { color: '#a698c4', maxRotation: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { ticks: { color: '#a698c4', callback: v => '£' + (v/1000) + 'k' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    };
+    growthChart = new Chart($('growthChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'ISA', data: [], borderColor: '#2fd6a7', backgroundColor: 'rgba(47,214,167,0.08)', tension: 0.25, pointRadius: 0, fill: true },
+        { label: 'Pension', data: [], borderColor: '#f2b84b', backgroundColor: 'rgba(242,184,75,0.08)', tension: 0.25, pointRadius: 0, fill: true },
+        { label: 'Combined', data: [], borderColor: '#c792ea', borderDash: [5,4], tension: 0.25, pointRadius: 0, fill: false }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f0eaf9' } } },
+        scales: commonScales
+      }
+    });
+    drawdownChart = new Chart($('drawdownChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Combined pot', data: [], borderColor: '#c792ea', backgroundColor: 'rgba(199,146,234,0.12)', tension: 0.25, pointRadius: 0, fill: true }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: commonScales
+      }
+    });
+  }
+
+  // ---------- core projection ----------
+  function simulateMortgage(balance0, monthlyRate, payment, overpay, capMonths){
+    let bal = balance0, months = 0, cumInterest = 0;
+    if(bal <= 0) return { months: 0, cumInterest: 0, stalled: false };
+    while(bal > 0.5 && months < capMonths){
+      const interest = bal * monthlyRate;
+      let principal = payment - interest + overpay;
+      if(principal <= 0) return { months: capMonths, cumInterest, stalled: true };
+      if(principal > bal) principal = bal;
+      bal -= principal;
+      cumInterest += interest;
+      months++;
+    }
+    return { months, cumInterest, stalled: months >= capMonths };
+  }
+
+  function compute(){
+    refreshSliderBounds();
+    syncSliderLabels();
+
+    const currentAge = parseFloat($('currentAge').value) || 30;
+    const retireAge = parseFloat($('retireAge').value) || 65;
+    const planToAge = parseFloat($('planToAge').value) || 90;
+    const monthsToRetire = Math.max(0, Math.round((retireAge - currentAge) * 12));
+
+    const isaStart = parseFloat($('isaBalance').value) || 0;
+    const isaGrowthPct = parseFloat($('isaGrowth').value) || 0;
+    const isaMonthlyContrib = parseFloat($('isaMonthly').value) || 0;
+    const isaMonthlyRate = Math.pow(1 + isaGrowthPct / 100, 1/12) - 1;
+
+    const pensionStart = parseFloat($('pensionPot').value) || 0;
+    const pensionGrowthPct = parseFloat($('pensionGrowth').value) || 0;
+    const salary = parseFloat($('salary').value) || 0;
+    const employeePct = parseFloat($('employeePct').value) || 0;
+    const employerPct = parseFloat($('employerPct').value) || 0;
+    const pensionMonthlyContrib = salary * (employeePct + employerPct) / 100 / 12;
+    const pensionMonthlyRate = Math.pow(1 + pensionGrowthPct / 100, 1/12) - 1;
+
+    let isaBal = isaStart, pensionBal = pensionStart;
+    const ages = [Math.round(currentAge * 10) / 10];
+    const isaSeries = [Math.round(isaBal)];
+    const pensionSeries = [Math.round(pensionBal)];
+    const totalSeries = [Math.round(isaBal + pensionBal)];
+
+    for(let m = 1; m <= monthsToRetire; m++){
+      isaBal = (isaBal + isaMonthlyContrib) * (1 + isaMonthlyRate);
+      pensionBal = (pensionBal + pensionMonthlyContrib) * (1 + pensionMonthlyRate);
+      if(m % 12 === 0 || m === monthsToRetire){
+        ages.push(Math.round((currentAge + m/12) * 10) / 10);
+        isaSeries.push(Math.round(isaBal));
+        pensionSeries.push(Math.round(pensionBal));
+        totalSeries.push(Math.round(isaBal + pensionBal));
+      }
+    }
+
+    growthChart.data.labels = ages.map(a => 'Age ' + a);
+    growthChart.data.datasets[0].data = isaSeries;
+    growthChart.data.datasets[1].data = pensionSeries;
+    growthChart.data.datasets[2].data = totalSeries;
+    growthChart.update();
+
+    $('statIsaAtRetirement').textContent = gbp(isaBal);
+    $('statPensionAtRetirement').textContent = gbp(pensionBal);
+    $('statCombinedAtRetirement').textContent = gbp(isaBal + pensionBal);
+
+    // ---- mortgage overpayment effect ----
+    const mortBalance = parseFloat($('mortgageBalance').value) || 0;
+    const mortRatePct = parseFloat($('mortgageRate').value) || 0;
+    const mortPayment = parseFloat($('mortgagePayment').value) || 0;
+    const mortBaselineOverpay = parseFloat($('mortgageOverpayBaseline').value) || 0;
+    const mortExtraOverpay = parseFloat($('mortgageExtraOverpay').value) || 0;
+    const mortMonthlyRate = Math.pow(1 + mortRatePct / 100, 1/12) - 1;
+    const CAP_MONTHS = 900; // 75 years safety cap
+
+    const baseline = simulateMortgage(mortBalance, mortMonthlyRate, mortPayment, mortBaselineOverpay, CAP_MONTHS);
+    const withExtra = simulateMortgage(mortBalance, mortMonthlyRate, mortPayment, mortBaselineOverpay + mortExtraOverpay, CAP_MONTHS);
+
+    $('statMortgageBaseline').textContent = baseline.months === 0 ? 'Paid off' : (baseline.stalled ? "Won't pay off" : fmtYM(baseline.months));
+    $('statMortgageWithExtra').textContent = withExtra.months === 0 ? 'Paid off' : (withExtra.stalled ? "Won't pay off" : fmtYM(withExtra.months));
+
+    if(mortExtraOverpay <= 0){
+      $('mortgageSavedNote').textContent = 'Move the "extra mortgage overpayment" slider to see the effect.';
+    } else if(baseline.stalled || withExtra.stalled){
+      $('mortgageSavedNote').textContent = "Your current payment doesn't cover the interest due — the payoff figures above aren't meaningful until that's fixed.";
+    } else {
+      const monthsSaved = baseline.months - withExtra.months;
+      const interestSaved = baseline.cumInterest - withExtra.cumInterest;
+      $('mortgageSavedNote').textContent = `Pays off ${fmtYM(monthsSaved)} sooner and saves ${gbp(interestSaved)} in interest.`;
+    }
+
+    // ---- retirement income drawdown ----
+    const statePensionAnnual = parseFloat($('statePension').value) || 0;
+    const statePensionAge = parseFloat($('statePensionAge').value) || 67;
+    const desiredIncome = parseFloat($('desiredIncome').value) || 0;
+
+    let pot = isaBal + pensionBal;
+    const drawAges = [Math.round(retireAge)];
+    const drawSeries = [Math.round(pot)];
+    let depletionAge = null;
+
+    for(let age = Math.round(retireAge) + 1; age <= planToAge; age++){
+      const spThisYear = age >= statePensionAge ? statePensionAnnual : 0;
+      const neededFromPot = Math.max(0, desiredIncome - spThisYear);
+      pot = pot * (1 + pensionGrowthPct / 100) - neededFromPot;
+      if(pot < 0) pot = 0;
+      drawAges.push(age);
+      drawSeries.push(Math.round(pot));
+      if(pot <= 0 && depletionAge === null) depletionAge = age;
+    }
+
+    drawdownChart.data.labels = drawAges.map(a => 'Age ' + a);
+    drawdownChart.data.datasets[0].data = drawSeries;
+    drawdownChart.update();
+
+    const outcomeEl = $('drawdownOutcome');
+    if(depletionAge !== null){
+      outcomeEl.className = 'outcome-box warn';
+      outcomeEl.textContent = `⚠ At ${gbp(desiredIncome)}/yr, the pot runs out at age ${depletionAge} — ${planToAge - depletionAge} year(s) before your "plan to" age of ${planToAge}.`;
+    } else {
+      outcomeEl.className = 'outcome-box good';
+      outcomeEl.textContent = `✓ At ${gbp(desiredIncome)}/yr, the pot lasts to age ${planToAge} with an estimated ${gbp(pot)} left over.`;
+    }
+
+    saveNow();
+  }
+
+  // ---------- wire up inputs ----------
+  STARTING_IDS.concat(SLIDER_IDS).forEach(id => {
+    $(id).addEventListener('input', compute);
+    $(id).addEventListener('change', compute);
+  });
+
+  // ---------- init ----------
+  initCharts();
+  refreshSliderBounds();
+  compute();
+})();
+</script>
+</body>
+</html>

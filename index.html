@@ -73,6 +73,21 @@
     display:flex;align-items:center;gap:8px;
   }
   .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--text);}
+  .whatif-banner{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    background:linear-gradient(120deg, rgba(199,146,234,0.14), rgba(79,195,247,0.08));
+    border:1px solid rgba(199,146,234,0.4);
+    border-radius:var(--radius);
+    padding:18px 22px;
+    margin-bottom:22px;
+    text-decoration:none;
+    color:var(--text);
+    transition:border-color .15s;
+  }
+  .whatif-banner:hover{border-color:#c792ea;}
+  .whatif-banner h2{margin:0 0 4px;font-size:1.05rem;}
+  .whatif-banner p{margin:0;color:var(--muted);font-size:0.85rem;max-width:640px;}
+  .whatif-banner-arrow{flex-shrink:0;font-weight:700;color:#c792ea;font-size:0.9rem;white-space:nowrap;}
   .sources-grid{
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -226,6 +241,14 @@
     <h1>📊 Finances Dashboard</h1>
     <p>Import the summary files from your ISA, pension, mortgage, budget, credit card and savings trackers to see everything in one place.</p>
   </header>
+
+  <a href="whatif_planner.html" target="_blank" rel="noopener" class="whatif-banner">
+    <div>
+      <h2>🎛️ What-If Planner</h2>
+      <p>Drag sliders on retirement age, ISA saving, mortgage overpayments and retirement income to explore scenarios — starting from your real numbers, without touching your real trackers.</p>
+    </div>
+    <span class="whatif-banner-arrow">Open →</span>
+  </a>
 
   <div class="sources-grid">
     <div class="card source-card" style="border-top-color:var(--budget);">
