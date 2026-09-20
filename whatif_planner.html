@@ -129,6 +129,25 @@
   .outcome-box.good{background:rgba(47,214,167,0.12);border:1px solid rgba(47,214,167,0.4);color:var(--good);}
   .outcome-box.warn{background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.4);color:var(--danger);}
   footer{text-align:center;color:var(--muted);font-size:0.68rem;margin-top:10px;line-height:1.5;}
+
+  .mc-toggle-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .mc-toggle-label{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.8rem;font-weight:700;}
+  .mc-toggle-label input{position:absolute;opacity:0;width:0;height:0;}
+  .mc-switch{
+    position:relative;width:38px;height:21px;flex:none;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:999px;transition:background 0.15s,border-color 0.15s;
+  }
+  .mc-switch::before{
+    content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+    background:var(--muted);transition:transform 0.15s,background 0.15s;
+  }
+  .mc-toggle-label input:checked + .mc-switch{background:rgba(199,146,234,0.35);border-color:var(--accent);}
+  .mc-toggle-label input:checked + .mc-switch::before{transform:translateX(17px);background:var(--accent);}
+  .mc-toggle-note{color:var(--muted);font-size:0.7rem;}
+  .stat.mcsuccess .value{color:var(--accent-2);}
 </style>
 </head>
 <body>
@@ -144,8 +163,17 @@
     <button id="refreshBtn" type="button">↻ Refresh from trackers</button>
   </div>
 
+  <div class="mc-toggle-row">
+    <label class="mc-toggle-label" for="mcToggle">
+      <input type="checkbox" id="mcToggle">
+      <span class="mc-switch"></span>
+      <span id="mcToggleText">🎲 Monte Carlo forecasting: Off</span>
+    </label>
+    <span class="mc-toggle-note">Runs 500 random market scenarios instead of one fixed growth rate, and shows the range of outcomes.</span>
+  </div>
+
   <div class="note-box">
-    This is a sandbox: it starts from your real numbers but nothing you do here is saved back to your ISA, pension, mortgage or savings trackers. It assumes one fixed growth rate per year rather than real market ups and downs — a future update will add a probability-based (Monte Carlo) view alongside this one.
+    This is a sandbox: it starts from your real numbers but nothing you do here is saved back to your ISA, pension, mortgage or savings trackers. By default it assumes one fixed growth rate per year — switch on Monte Carlo above to see a range of outcomes under random market returns instead.
   </div>
 
   <!-- RESULTS -->
@@ -153,6 +181,7 @@
     <div class="card chart-card">
       <h2><span class="dot"></span>ISA + pension — growth, then drawdown</h2>
       <canvas id="growthChart" height="80"></canvas>
+      <canvas id="mcChart" height="80" style="display:none;"></canvas>
       <div class="summary-grid" style="margin-top:8px;">
         <div class="stat isa">
           <div class="label">ISA at retirement</div>
@@ -172,7 +201,8 @@
         </div>
       </div>
       <div id="drawdownOutcome" class="outcome-box good" style="margin-top:8px;">—</div>
-      <p class="chart-note">Solid line = saving up; dashed = spending down from retirement age onward. Pension figures are shown after any tax-free cash is taken.</p>
+      <div id="mcSuccessBox" class="outcome-box good" style="margin-top:8px;display:none;">—</div>
+      <p class="chart-note" id="growthChartNote">Solid line = saving up; dashed = spending down from retirement age onward. Pension figures are shown after any tax-free cash is taken.</p>
       <p class="chart-note" id="taxFreeCashCapNote"></p>
     </div>
 
@@ -403,6 +433,7 @@
     try{
       const state = {};
       STARTING_IDS.concat(SLIDER_IDS).forEach(id => { state[id] = $(id).value; });
+      state.monteCarloOn = $('mcToggle').checked;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }catch(e){ /* localStorage unavailable */ }
   }
@@ -412,6 +443,7 @@
     STARTING_IDS.concat(SLIDER_IDS).forEach(id => {
       if(saved[id] != null && $(id)) $(id).value = saved[id];
     });
+    if(saved.monteCarloOn != null) $('mcToggle').checked = !!saved.monteCarloOn;
   }
 
   applyState(loadSaved());
@@ -518,7 +550,7 @@
   }
 
   // ---------- charts ----------
-  let growthChart, spendChart;
+  let growthChart, spendChart, mcChart;
   let currentRetireIndex = 0; // index in growthChart's labels where accumulation ends and drawdown begins — updated every compute()
   function initCharts(){
     const tickFont = { size: 9 };
@@ -560,6 +592,19 @@
         }
       }
     });
+    mcChart = new Chart($('mcChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: '10th percentile', data: [], borderColor: 'rgba(79,195,247,0.4)', backgroundColor: 'rgba(79,195,247,0.14)', tension: 0.2, pointRadius: 0, fill: false },
+        { label: '90th percentile', data: [], borderColor: 'rgba(79,195,247,0.4)', backgroundColor: 'rgba(79,195,247,0.14)', tension: 0.2, pointRadius: 0, fill: '-1' },
+        { label: 'Median', data: [], borderColor: '#c792ea', backgroundColor: 'transparent', tension: 0.2, pointRadius: 0, fill: false, borderWidth: 2.5 }
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: legendOpts },
+        scales: commonScales
+      }
+    });
   }
 
   // ---------- core projection ----------
@@ -576,6 +621,117 @@
       months++;
     }
     return { months, cumInterest, stalled: months >= capMonths };
+  }
+
+  // ---------- Monte Carlo (probability-based) projection ----------
+  // Runs the same accumulation-then-drawdown model as the deterministic chart above, but instead
+  // of one fixed growth rate per year, each year's ISA and pension return is drawn from a normal
+  // distribution (same random "market" shock applied to both, since they're both broadly
+  // market-correlated in this simplified model). Repeating that hundreds of times gives a range
+  // of outcomes instead of a single line.
+  const MC_TRIALS = 500;
+  const MC_VOL = 0.15; // assumed annual volatility (~typical for a global equity/multi-asset fund) — fixed, not user-adjustable, to keep this sandbox simple
+
+  function randNormal(){
+    // Box-Muller transform: turns two uniform random numbers into one standard-normal one.
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  function runMonteCarlo(p){
+    const {
+      isaStart, isaMonthlyContrib, isaGrowthPct,
+      pensionStart, pensionMonthlyContrib, pensionGrowthPct,
+      taxFreeCashRequested, lsaRemaining,
+      statePensionAnnual, statePensionAge, incomeLevel1, secondAge, incomeLevel2,
+      rAge, planToAge, ages
+    } = p;
+
+    const trialBalances = ages.map(() => []); // one array of combined balances per age, across all trials
+
+    let successes = 0;
+
+    for(let t = 0; t < MC_TRIALS; t++){
+      let isaBal = isaStart, pensionBal = pensionStart;
+      let idx = 0;
+      trialBalances[idx].push(isaBal + pensionBal);
+      idx++;
+
+      // ---- accumulation phase: one randomised year per remaining age-point up to retirement ----
+      while(idx < ages.length && ages[idx] <= rAge){
+        const z = randNormal();
+        isaBal = Math.max(0, (isaBal + isaMonthlyContrib * 12) * (1 + isaGrowthPct / 100 + MC_VOL * z));
+        pensionBal = Math.max(0, (pensionBal + pensionMonthlyContrib * 12) * (1 + pensionGrowthPct / 100 + MC_VOL * z));
+        trialBalances[idx].push(isaBal + pensionBal);
+        idx++;
+      }
+
+      // ---- tax-free cash at retirement, capped per-trial exactly like the deterministic model ----
+      const trialMaxCash = Math.max(0, Math.min(pensionBal * 0.25, lsaRemaining));
+      const cashOut = Math.min(taxFreeCashRequested, trialMaxCash);
+      pensionBal = Math.max(0, pensionBal - cashOut);
+      const lastAccumIdx = idx - 1;
+      if(lastAccumIdx >= 0) trialBalances[lastAccumIdx][trialBalances[lastAccumIdx].length - 1] = isaBal + pensionBal;
+
+      // ---- drawdown phase ----
+      let drawIsaBal = isaBal, drawPensionBal = pensionBal;
+      let depleted = false;
+      for(let age = rAge + 1; age <= planToAge; age++){
+        const target = age < secondAge ? incomeLevel1 : incomeLevel2;
+        const spThisYear = age >= statePensionAge ? statePensionAnnual : 0;
+        const otherThisYear = otherIncomeForAge(age);
+        const neededFromPots = Math.max(0, target - spThisYear - otherThisYear);
+
+        const totalPots = drawIsaBal + drawPensionBal;
+        let isaDraw = 0, pensionDraw = 0;
+        if(totalPots > 0 && neededFromPots > 0){
+          const isaShare = drawIsaBal / totalPots;
+          isaDraw = Math.min(drawIsaBal, neededFromPots * isaShare);
+          pensionDraw = Math.min(drawPensionBal, neededFromPots - isaDraw);
+          const shortfall = neededFromPots - isaDraw - pensionDraw;
+          if(shortfall > 0.01 && drawIsaBal - isaDraw > 0){
+            isaDraw += Math.min(drawIsaBal - isaDraw, shortfall);
+          }
+        }
+
+        const z = randNormal();
+        drawIsaBal = Math.max(0, Math.max(0, drawIsaBal - isaDraw) * (1 + isaGrowthPct / 100 + MC_VOL * z));
+        drawPensionBal = Math.max(0, Math.max(0, drawPensionBal - pensionDraw) * (1 + pensionGrowthPct / 100 + MC_VOL * z));
+        const combined = drawIsaBal + drawPensionBal;
+        if(combined <= 0) depleted = true;
+
+        if(idx < ages.length && ages[idx] === age){
+          trialBalances[idx].push(combined);
+          idx++;
+        }
+      }
+      if(!depleted) successes++;
+    }
+
+    const p10 = [], p50 = [], p90 = [];
+    trialBalances.forEach(arr => {
+      arr.sort((a, b) => a - b);
+      const n = arr.length;
+      const pick = pct => arr[Math.min(n - 1, Math.max(0, Math.round(pct * (n - 1))))];
+      p10.push(Math.round(pick(0.10)));
+      p50.push(Math.round(pick(0.50)));
+      p90.push(Math.round(pick(0.90)));
+    });
+
+    return { p10, p50, p90, successRate: successes / MC_TRIALS };
+  }
+
+  function updateMcVisibility(){
+    const on = $('mcToggle').checked;
+    $('growthChart').style.display = on ? 'none' : '';
+    $('mcChart').style.display = on ? '' : 'none';
+    $('mcSuccessBox').style.display = on ? '' : 'none';
+    $('mcToggleText').textContent = on ? '🎲 Monte Carlo forecasting: On' : '🎲 Monte Carlo forecasting: Off';
+    $('growthChartNote').textContent = on
+      ? 'Shaded band = 10th-90th percentile range across 500 simulated market paths; solid purple line = median outcome.'
+      : 'Solid line = saving up; dashed = spending down from retirement age onward. Pension figures are shown after any tax-free cash is taken.';
   }
 
   function compute(){
@@ -748,6 +904,27 @@
       outcomeEl.textContent = `✓ At ${incomeSummary}, the combined pot lasts to age ${planToAge} with an estimated ${gbp(lastCombined)} left over.`;
     }
 
+    // ---- Monte Carlo (only computed when the toggle is on, to keep normal dragging light) ----
+    if($('mcToggle').checked){
+      const mc = runMonteCarlo({
+        isaStart, isaMonthlyContrib, isaGrowthPct,
+        pensionStart, pensionMonthlyContrib, pensionGrowthPct,
+        taxFreeCashRequested: taxFreeCashWithdrawn, lsaRemaining,
+        statePensionAnnual, statePensionAge, incomeLevel1, secondAge, incomeLevel2,
+        rAge, planToAge, ages
+      });
+      mcChart.data.labels = ages.map(a => 'Age ' + a);
+      mcChart.data.datasets[0].data = mc.p10;
+      mcChart.data.datasets[1].data = mc.p90;
+      mcChart.data.datasets[2].data = mc.p50;
+      mcChart.update();
+
+      const successPct = Math.round(mc.successRate * 100);
+      const mcBox = $('mcSuccessBox');
+      mcBox.className = 'outcome-box ' + (successPct >= 70 ? 'good' : 'warn');
+      mcBox.textContent = `🎲 Across ${MC_TRIALS} simulated market scenarios (~${Math.round(MC_VOL*100)}% annual volatility), your combined pot lasted to age ${planToAge} in ${successPct}% of them.`;
+    }
+
     saveNow();
   }
 
@@ -756,9 +933,15 @@
     $(id).addEventListener('input', compute);
     $(id).addEventListener('change', compute);
   });
+  $('mcToggle').addEventListener('change', () => {
+    updateMcVisibility();
+    compute();
+    saveNow();
+  });
 
   // ---------- init ----------
   initCharts();
+  updateMcVisibility();
   refreshSliderBounds();
   compute();
 })();
