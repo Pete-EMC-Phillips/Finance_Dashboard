@@ -73,36 +73,20 @@
     display:flex;align-items:center;gap:8px;
   }
   .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--text);}
-  .whatif-banner{
-    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-    background:linear-gradient(120deg, rgba(199,146,234,0.14), rgba(79,195,247,0.08));
-    border:1px solid rgba(199,146,234,0.4);
-    border-radius:var(--radius);
-    padding:18px 22px;
-    margin-bottom:22px;
-    text-decoration:none;
-    color:var(--text);
-    transition:border-color .15s;
+  .tool-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px;}
+  .tool-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:7px 14px;border-radius:100px;font-size:0.8rem;font-weight:600;
+    text-decoration:none;white-space:nowrap;transition:border-color .15s,background .15s;
   }
-  .whatif-banner:hover{border-color:#c792ea;}
-  .whatif-banner h2{margin:0 0 4px;font-size:1.05rem;}
-  .whatif-banner p{margin:0;color:var(--muted);font-size:0.85rem;max-width:640px;}
-  .whatif-banner-arrow{flex-shrink:0;font-weight:700;color:#c792ea;font-size:0.9rem;white-space:nowrap;}
-  .yby-banner{
-    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-    background:linear-gradient(120deg, rgba(242,184,75,0.14), rgba(79,195,247,0.08));
-    border:1px solid rgba(242,184,75,0.4);
-    border-radius:var(--radius);
-    padding:18px 22px;
-    margin-bottom:22px;
-    text-decoration:none;
-    color:var(--text);
-    transition:border-color .15s;
-  }
-  .yby-banner:hover{border-color:var(--pension);}
-  .yby-banner h2{margin:0 0 4px;font-size:1.05rem;}
-  .yby-banner p{margin:0;color:var(--muted);font-size:0.85rem;max-width:640px;}
-  .yby-banner-arrow{flex-shrink:0;font-weight:700;color:var(--pension);font-size:0.9rem;white-space:nowrap;}
+  .tool-btn:hover{background:var(--panel);}
+  .tool-btn-whatif{border-color:rgba(199,146,234,0.45);}
+  .tool-btn-whatif:hover{border-color:#c792ea;}
+  .tool-btn-yby{border-color:rgba(242,184,75,0.45);}
+  .tool-btn-yby:hover{border-color:var(--pension);}
+  .tool-btn-tax{border-color:rgba(79,195,247,0.45);}
+  .tool-btn-tax:hover{border-color:var(--mortgage);}
   .sources-grid{
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -257,21 +241,11 @@
     <p>Import the summary files from your ISA, pension, mortgage, budget, credit card and savings trackers to see everything in one place.</p>
   </header>
 
-  <a href="whatif_planner.html" target="_blank" rel="noopener" class="whatif-banner">
-    <div>
-      <h2>🎛️ What-If Planner</h2>
-      <p>Drag sliders on retirement age, ISA saving, mortgage overpayments and retirement income to explore scenarios — starting from your real numbers, without touching your real trackers.</p>
-    </div>
-    <span class="whatif-banner-arrow">Open →</span>
-  </a>
-
-  <a href="yearbyyear.html" target="_blank" rel="noopener" class="yby-banner">
-    <div>
-      <h2>📅 Year-by-Year</h2>
-      <p>A combined table of your saving years and retirement drawdown, side by side — pension pot, savings, income, tax and more, one row per age, with milestones like retirement and State Pension flagged along the way.</p>
-    </div>
-    <span class="yby-banner-arrow">Open →</span>
-  </a>
+  <div class="tool-buttons">
+    <a href="whatif_planner.html" target="_blank" rel="noopener" class="tool-btn tool-btn-whatif">🎛️ What-If Planner</a>
+    <a href="yearbyyear.html" target="_blank" rel="noopener" class="tool-btn tool-btn-yby">📅 Year-by-Year</a>
+    <a href="taxcode_tracker.html" target="_blank" rel="noopener" class="tool-btn tool-btn-tax">🧮 Tax Code Calculator</a>
+  </div>
 
   <div class="sources-grid">
     <div class="card source-card" style="border-top-color:var(--budget);">
