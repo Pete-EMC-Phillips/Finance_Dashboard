@@ -2520,6 +2520,144 @@
     return {ages, balances, potBalances, savBalances, isaBalances, depletionAge, yearAges, dbIncomes, spIncomes, otherIncomes, taxableOtherIncomes, taxFreeSpends, potSpends, savSpends, isaSpends, drawdownIsaTaxable, targets};
   }
 
+  // Simple UK income-tax band estimate for 2026/27 (England/NI rates only — ignores Scottish
+  // bands and any income outside this pot). Used only for the indicative "Tax"/"Net" columns on
+  // the standalone Year-by-Year table; not a substitute for proper tax planning.
+  function estimateIncomeTax(taxableIncome){
+    const PA = 12570, BASIC_LIMIT = 50270, HIGHER_LIMIT = 125140;
+    const income = Math.max(0, taxableIncome);
+    let allowance = PA;
+    if(income > 100000) allowance = Math.max(0, PA - (income - 100000) / 2);
+    const taxable = Math.max(0, income - allowance);
+    const basicBand = Math.max(0, Math.min(taxable, BASIC_LIMIT - allowance));
+    const higherBand = Math.max(0, Math.min(taxable - basicBand, HIGHER_LIMIT - BASIC_LIMIT));
+    const addBand = Math.max(0, taxable - basicBand - higherBand);
+    return basicBand * 0.20 + higherBand * 0.40 + addBand * 0.45;
+  }
+
+  // Builds one row per age — saving phase (medium-growth pension + savings + ISA, from the
+  // accumulation series already computed above) followed by retirement phase (medJourney) — plus
+  // a list of milestone events (retirement, each DB pension starting, State Pension starting).
+  // Exported as-is (lastResults.yearByYear) so the standalone "Year-by-Year" viewer page can
+  // render it directly without re-implementing any of this tracker's simulation logic itself.
+  function buildYearByYearRows(opts){
+    const {schedule, contribSeries, combinedMedMonthly, savMedSeries, isaMedSeries,
+      dormantStartingSum, currentAge, retireAge, medJourney, statePensionAge, statePension,
+      dbPensions, otherIncome} = opts;
+
+    const rows = [];
+
+    // cumulative savings/ISA contributions, same cadence as contribSeries, so a same-index delta
+    // gives that year's actual paid-in amount regardless of any pre-schedule baseline
+    const savingsMonthlyAmount = savingsPreProjected ? 0 : (parseFloat($('savingsMonthly').value) || 0);
+    const isaMonthlyAmount = isaPreProjected ? 0 : (parseFloat($('isaMonthly').value) || 0);
+    const savCumSeries = [], isaCumSeries = [];
+    let savCum = 0, isaCum = 0;
+    for(let m = 0; m < schedule.totalMonths; m++){
+      savCum += savingsMonthlyAmount;
+      isaCum += isaMonthlyAmount;
+      savCumSeries.push(savCum);
+      isaCumSeries.push(isaCum);
+    }
+
+    const startingLiquid = (schedule.startingBalance || 0) + dormantStartingSum +
+      (parseFloat($('savingsBalance').value) || 0) + (parseFloat($('isaBalance').value) || 0);
+    function liquidAt(m){ return m < 0 ? startingLiquid : (combinedMedMonthly[m] + savMedSeries[m] + isaMedSeries[m]); }
+    function contribAt(m){ return m < 0 ? 0 : (contribSeries[m] + savCumSeries[m] + isaCumSeries[m]); }
+
+    // round to whole years of age throughout, so the saving-phase ages line up cleanly with the
+    // retirement-phase ages (which are always whole numbers, one row per birthday)
+    const currentAgeInt = Math.round(currentAge);
+    const wholeYears = Math.floor(schedule.totalMonths / 12);
+    for(let k = 0; k < wholeYears; k++){
+      const m = k * 12 + 11;
+      const mPrev = m - 12;
+      const inOut = Math.round(contribAt(m) - contribAt(mPrev));
+      const growth = Math.round((liquidAt(m) - liquidAt(mPrev)) - inOut);
+      rows.push({
+        age: currentAgeInt + k + 1,
+        phase: 'saving',
+        liquidPot: Math.round(liquidAt(m)),
+        dcPot: Math.round(combinedMedMonthly[m]),
+        savingsAmt: Math.round(savMedSeries[m]),
+        isaAmt: Math.round(isaMedSeries[m]),
+        growth,
+        inOut,
+        inOutLabel: 'household contributions',
+        income: null, incomeBreakdown: null,
+        tax: null, net: null, target: null,
+        savingsColumn: Math.round(savMedSeries[m])
+      });
+    }
+
+    // ---- retirement phase (medium scenario) ----
+    medJourney.yearAges.forEach((age, idx) => {
+      const dbIncome = medJourney.dbIncomes[idx] || 0;
+      const spIncome = medJourney.spIncomes[idx] || 0;
+      const otherInc = medJourney.otherIncomes[idx] || 0;
+      const taxableOtherInc = medJourney.taxableOtherIncomes[idx] || 0;
+      const taxFreeSpend = medJourney.taxFreeSpends[idx] || 0;
+      const potSpend = medJourney.potSpends[idx] || 0;
+      const savSpend = medJourney.savSpends[idx] || 0;
+      const isaSpend = medJourney.isaSpends[idx] || 0;
+      const spendOut = potSpend + savSpend + isaSpend + taxFreeSpend;
+      const grossIncome = dbIncome + spIncome + otherInc + spendOut;
+      // rough taxable-income estimate — mirrors the "Where the money comes from" tax check above
+      const taxableIncome = dbIncome + spIncome + taxableOtherInc + potSpend;
+      const tax = Math.round(estimateIncomeTax(taxableIncome));
+
+      const potBalance = medJourney.potBalances[idx + 1] || 0;
+      const savBalance = medJourney.savBalances[idx + 1] || 0;
+      const isaBalance = medJourney.isaBalances[idx + 1] || 0;
+      const potBalanceStart = medJourney.potBalances[idx] || 0;
+      const savBalanceStart = medJourney.savBalances[idx] || 0;
+      const isaBalanceStart = medJourney.isaBalances[idx] || 0;
+      const liquidPot = potBalance + savBalance + isaBalance;
+      const liquidPotStart = potBalanceStart + savBalanceStart + isaBalanceStart;
+      const growth = Math.round((liquidPot - liquidPotStart) + spendOut);
+
+      rows.push({
+        age,
+        phase: 'retirement',
+        liquidPot: Math.round(liquidPot),
+        dcPot: Math.round(potBalance),
+        savingsAmt: Math.round(savBalance),
+        isaAmt: Math.round(isaBalance),
+        growth,
+        inOut: -Math.round(spendOut),
+        inOutLabel: 'withdrawal',
+        income: Math.round(grossIncome),
+        incomeBreakdown: {db: Math.round(dbIncome), sp: Math.round(spIncome), other: Math.round(otherInc)},
+        tax: tax > 0 ? -tax : 0,
+        net: Math.round(grossIncome - tax),
+        target: Math.round(medJourney.targets[idx] || 0),
+        savingsColumn: Math.round(savBalance)
+      });
+    });
+
+    // ---- milestones ----
+    const milestones = [];
+    if(retireAge != null){
+      milestones.push({age: Math.round(retireAge), label: 'Retirement begins', detail: 'Drawdown starts; pension contributions stop.'});
+    }
+    dbPensions.forEach(d => {
+      if(d.startAge != null && (parseFloat(d.amount) || 0) > 0){
+        milestones.push({age: Math.round(d.startAge), label: `${d.name || 'DB pension'} starts`, detail: `${gbp(parseFloat(d.amount) || 0)}/yr`});
+      }
+    });
+    if(statePension > 0 && statePensionAge != null){
+      milestones.push({age: Math.round(statePensionAge), label: 'State Pension starts', detail: `${gbp(statePension)}/yr`});
+    }
+    (otherIncome || []).forEach(o => {
+      if(o.startAge != null && (parseFloat(o.amount) || 0) > 0){
+        milestones.push({age: Math.round(o.startAge), label: `${o.name || 'Other income'} starts`, detail: `${gbp(parseFloat(o.amount) || 0)}/yr`});
+      }
+    });
+    milestones.sort((a, b) => a.age - b.age);
+
+    return {rows, milestones};
+  }
+
   function projectBalance(schedule, annualRatePct){
     const monthlyRate = Math.pow(1 + annualRatePct/100, 1/12) - 1;
     let balance = schedule.startingBalance;
@@ -2859,6 +2997,12 @@
 
     const rdForExport = retirementDate();
 
+    const yearByYear = buildYearByYearRows({
+      schedule, contribSeries, combinedMedMonthly, savMedSeries, isaMedSeries,
+      dormantStartingSum, currentAge, retireAge, medJourney, statePensionAge, statePension,
+      dbPensions, otherIncome
+    });
+
     lastResults = {
       currentAge,
       retireAge,
@@ -2907,7 +3051,11 @@
         savSpends: medJourney.savSpends,
         isaSpends: medJourney.isaSpends,
         targets: medJourney.targets
-      }
+      },
+      // combined saving + retirement per-year table, plus named milestone events (retirement,
+      // each DB pension starting, State Pension starting) — feeds the standalone Year-by-Year
+      // viewer page; see buildYearByYearRows() above for how each field is derived
+      yearByYear
     };
 
     renderLumpList();

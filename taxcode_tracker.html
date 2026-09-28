@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Take-Home Pay Calculator</title>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
+<style>
+  :root{
+    --bg:#130f0d;
+    --panel:#1d1613;
+    --panel-2:#271e19;
+    --border:#3a2e27;
+    --text:#f4efe9;
+    --muted:#b3a89d;
+    --accent:#f2b84b;
+    --accent-2:#4fc3f7;
+    --good:#2fd6a7;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #241a13 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1400px;margin:0 auto;}
+  .input-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;align-items:start;margin-bottom:4px;}
+  .input-grid .card, .input-grid .result-card{margin-bottom:0;}
+  .result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;align-items:start;margin-top:18px;margin-bottom:18px;}
+  .result-grid .result-card, .result-grid .card{margin-bottom:0;height:100%;}
+  header{margin-bottom:18px;}
+  header h1{font-size:1.7rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;}
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:18px;}
+  .card h2{font-size:1rem;margin:0 0 4px;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .card p.hint{color:var(--muted);font-size:0.8rem;margin:0 0 14px;line-height:1.4;}
+  label{display:block;font-size:0.82rem;color:var(--muted);margin-bottom:6px;font-weight:600;}
+  .field{position:relative;margin-bottom:16px;}
+  .field .prefix{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:0.95rem;pointer-events:none;}
+  .field .suffix{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:0.95rem;pointer-events:none;}
+  .field.has-prefix input{padding-left:26px;}
+  .field.has-suffix input{padding-right:26px;}
+  input[type="text"], input[type="number"]{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:9px 11px;border-radius:9px;font-size:0.95rem;outline:none;font-variant-numeric:tabular-nums;
+  }
+  input:focus{border-color:var(--accent);}
+  select{
+    width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:9px 11px;border-radius:9px;font-size:0.95rem;outline:none;cursor:pointer;
+    -webkit-appearance:menulist;appearance:menulist;
+  }
+  select:focus{border-color:var(--accent);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:560px){ .row2{grid-template-columns:1fr;} }
+  .slider-row{display:flex;align-items:center;gap:10px;}
+  input[type="range"]{
+    flex:1;-webkit-appearance:none;height:5px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:3px solid var(--accent);cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer;
+  }
+  .slider-val{min-width:56px;text-align:right;font-weight:700;font-size:0.85rem;color:var(--accent);}
+  .slider-minmax{display:flex;justify-content:space-between;color:var(--muted);font-size:0.68rem;margin-top:2px;}
+  .taper-hint{
+    font-size:0.78rem;line-height:1.4;border-radius:9px;padding:8px 11px;margin:8px 0 16px;
+  }
+  .taper-hint.ok{background:rgba(47,214,167,0.10);border:1px solid rgba(47,214,167,0.35);color:var(--good);}
+  .taper-hint.warn{background:rgba(255,107,107,0.10);border:1px solid rgba(255,107,107,0.35);color:var(--danger);}
+  .freq-toggle{display:flex;gap:6px;justify-content:center;margin-top:4px;}
+  .freq-toggle button{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--muted);
+    padding:5px 14px;border-radius:999px;cursor:pointer;font-size:0.78rem;font-weight:600;
+  }
+  .freq-toggle button.active{background:var(--accent);color:#1d1613;border-color:var(--accent);}
+  .freq-toggle button:hover:not(.active){border-color:var(--accent);color:var(--accent);}
+  .takehome-badges{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;}
+  .takehome-badge{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:999px;
+    padding:5px 12px;font-size:0.75rem;color:var(--muted);
+  }
+  .takehome-badge strong{color:var(--accent);font-weight:700;}
+
+  details.advanced{margin-top:2px;margin-bottom:16px;}
+  details.advanced summary{
+    cursor:pointer;font-size:0.85rem;font-weight:700;color:var(--accent);
+    list-style:none;display:flex;align-items:center;gap:6px;user-select:none;
+  }
+  details.advanced summary::-webkit-details-marker{display:none;}
+  details.advanced summary::before{content:'▸';font-size:0.7rem;}
+  details.advanced[open] summary::before{content:'▾';}
+  .advanced-body{padding-top:12px;}
+
+  .checkbox-row{display:flex;align-items:center;gap:9px;margin:14px 0 0;font-size:0.85rem;color:var(--muted);cursor:pointer;}
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;}
+
+  .income-list{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
+  .income-row{display:flex;align-items:flex-start;gap:8px;}
+  .income-row .field{flex:1;margin-bottom:0;}
+  .remove-income-btn{
+    width:38px;height:38px;flex-shrink:0;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--muted);border-radius:9px;font-size:1.1rem;line-height:1;cursor:pointer;
+  }
+  .remove-income-btn:hover{color:var(--danger);border-color:var(--danger);}
+  .remove-income-btn.hidden{display:none;}
+  .add-income-btn{
+    margin-top:2px;width:100%;padding:10px;border:1px dashed var(--border);background:transparent;
+    color:var(--accent);font-size:0.85rem;font-weight:700;border-radius:9px;cursor:pointer;
+  }
+  .add-income-btn:hover{border-color:var(--accent);background:rgba(242,184,75,0.08);}
+  .add-income-btn.hidden{display:none;}
+  .total-line{
+    display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;padding-top:14px;
+    border-top:1px solid var(--border);font-size:0.85rem;color:var(--muted);
+  }
+  .total-line strong{font-size:1rem;color:var(--text);}
+
+  .loan-panel{margin-top:14px;padding:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;}
+  .loan-panel .row2{margin-bottom:0;}
+  .loan-result{
+    display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding-top:12px;
+    border-top:1px solid var(--border);font-size:0.82rem;color:var(--muted);
+  }
+  .loan-result strong{font-size:0.95rem;color:var(--accent);}
+
+  .result-card{
+    background:linear-gradient(180deg,var(--panel) 0%,var(--panel-2) 100%);
+    border:1px solid var(--border);border-radius:var(--radius);padding:26px 20px;
+    display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin-bottom:18px;
+  }
+  .result-label{font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+  .result-code{font-weight:700;font-size:clamp(38px,9vw,52px);color:var(--accent);line-height:1;margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+  .result-code.k-code{color:var(--danger);}
+  .result-note{font-size:0.85rem;color:var(--muted);max-width:48ch;}
+
+  .breakdown{
+    margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+    border:1px solid var(--border);border-radius:10px;overflow:hidden;width:100%;align-items:stretch;
+  }
+  @media (max-width:560px){ .breakdown{grid-template-columns:1fr;} }
+  .breakdown-col{display:flex;flex-direction:column;gap:1px;background:var(--border);}
+  .breakdown-item{background:var(--panel);padding:12px 14px;text-align:left;}
+  .breakdown-item.hidden{display:none;}
+  .breakdown-item .k{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;}
+  .breakdown-item .v{font-size:0.95rem;font-variant-numeric:tabular-nums;color:var(--text);}
+  .breakdown-item .v.neg{color:var(--danger);}
+  .breakdown-item .v.accent{color:var(--accent);font-weight:700;}
+  .breakdown-item .v-sub{font-size:0.68rem;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;}
+
+  .chart-card canvas{max-height:280px;}
+  .chart-wrap{margin-top:4px;}
+  .chart-svg{width:100%;height:auto;display:block;overflow:visible;}
+  .axis-label{font-size:9.5px;fill:var(--muted);}
+  .grid-line{stroke:var(--border);stroke-width:1;}
+  .zero-line{stroke:var(--muted);stroke-width:1;stroke-dasharray:2 3;}
+  .taper-band{fill:rgba(255,180,84,0.12);}
+  .curve-line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+  .curve-fill{fill:rgba(242,184,75,0.10);}
+  .marker-dot{fill:var(--panel);stroke:var(--accent);stroke-width:2.5;}
+  .marker-dot.k-marker{stroke:var(--danger);}
+  .marker-line{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3;}
+  .chart-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:12px;font-size:0.78rem;color:var(--muted);}
+  .chart-legend .item{display:flex;align-items:center;gap:6px;}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .swatch.line{background:var(--accent);border-radius:50%;width:9px;height:9px;}
+  .swatch.band{background:rgba(255,180,84,0.12);border:1px solid var(--warn);}
+
+  table.datatable{width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:12px;}
+  table.datatable th, table.datatable td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.datatable th:first-child, table.datatable td:first-child{text-align:left;}
+  table.datatable th{font-weight:700;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.03em;color:var(--muted);}
+  table.datatable tr.current-row td{color:var(--accent);font-weight:700;}
+  .table-scroll{overflow-x:auto;}
+
+  .explainer{font-size:0.88rem;line-height:1.65;color:var(--muted);}
+  .explainer p{margin:0 0 14px;}
+  .explainer p:last-child{margin-bottom:0;}
+  .explainer strong{color:var(--text);font-weight:700;}
+  .explainer code{font-family:ui-monospace,monospace;background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:0.92em;color:var(--text);}
+
+  .save-note{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:0.78rem;margin-bottom:18px;}
+  .save-note button, .save-note .file-btn{
+    background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:8px;
+    cursor:pointer;font-size:0.78rem;display:inline-block;
+  }
+  .save-note button:hover, .save-note .file-btn:hover{color:var(--danger);border-color:var(--danger);}
+  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:0.85rem;margin-bottom:14px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;}
+  .back-link:hover{color:var(--accent);border-color:var(--accent);}
+  footer{text-align:center;color:var(--muted);font-size:0.78rem;margin-top:20px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
+    <div class="brand-logo" style="margin-bottom:14px;">
+      <svg width="210" height="46" viewBox="0 0 460 100" role="img" aria-label="Phillips Finance logo" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="15" width="70" height="70" rx="14" fill="#151b24" stroke="#2a3444" stroke-width="1"/>
+        <path d="M20 60 L43 38 L66 60" fill="none" stroke="#96a2b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="27" y="60" width="32" height="18" fill="none" stroke="#96a2b8" stroke-width="2.5"/>
+        <path d="M18 70 L32 58 L44 66 L60 44" fill="none" stroke="#2fd6a7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="60" cy="44" r="3.5" fill="#2fd6a7"/>
+        <text x="97" y="52" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="30" font-weight="700" fill="#eaeef4">Phillips<tspan fill="#4fc3f7"> Finance</tspan></text>
+        <text x="98" y="74" font-family="-apple-system,'Segoe UI',Arial,sans-serif" font-size="11" font-weight="600" letter-spacing="2" fill="#96a2b8">PERSONAL FINANCE TRACKERS</text>
+      </svg>
+    </div>
+    <h1>🧾 Take-Home Pay Calculator</h1>
+    <p>Enter your salary, overtime, and pension contribution — plus any other income, P11D benefits, prior-year underpayment or student loan — to see your real take-home pay, and use the pension slider to steer clear of the £100,000–£125,140 taper zone.</p>
+  </header>
+
+  <div class="save-note">
+    <span id="saveStatus">Your inputs are saved automatically in this browser.</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;">
+      <label class="file-btn">⬆ Import previous data<input type="file" id="importData" accept=".json" hidden></label>
+      <button id="exportData" type="button">⬇ Export summary</button>
+      <button id="clearSaved" type="button">Reset to defaults</button>
+    </span>
+  </div>
+
+  <div class="input-grid">
+  <div class="card">
+    <h2><span class="dot"></span>Income</h2>
+    <p class="hint">Your main salary and overtime, plus any other income. Annual, before tax.</p>
+
+    <label for="standardSalary">Standard salary</label>
+    <div class="field has-prefix">
+      <span class="prefix">£</span>
+      <input type="text" id="standardSalary" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+
+    <div class="row2">
+      <div>
+        <label for="overtimePct">Overtime (% of salary, monthly)</label>
+        <div class="field has-suffix" style="margin-bottom:6px;">
+          <input type="text" id="overtimePct" inputmode="decimal" value="8.1" autocomplete="off">
+          <span class="suffix">%</span>
+        </div>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <div class="total-line" style="margin-top:0;padding-top:0;border-top:none;">
+          <span>Overtime (annual)</span>
+          <strong id="overtimeAmountDisplay">£0</strong>
+        </div>
+      </div>
+    </div>
+    <p class="hint">A flat % of your standard salary, paid every month on top of it — not pensionable.</p>
+
+    <label for="pensionSlider">Pension contribution</label>
+    <div class="slider-row">
+      <input type="range" id="pensionSlider" min="0" max="60" step="0.5" value="5">
+      <span class="slider-val" id="pensionPctDisplay">5.0%</span>
+    </div>
+    <div class="slider-minmax"><span>£0/year</span><span id="pensionAmountDisplay">£0/year</span><span>60%</span></div>
+    <p class="hint taper-hint ok" id="pensionTaperHint">Enter a salary above to see how the taper affects you.</p>
+
+    <label for="bonus">One-off bonus</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="bonus" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+
+    <label for="bonusPension">Of which, paid into pension</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="bonusPension" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <div class="total-line" style="margin-top:0;padding-top:0;border-top:none;">
+      <span>Bonus paid to you in cash (before tax)</span>
+      <strong id="bonusCashDisplay">£0</strong>
+    </div>
+    <p class="hint" id="bonusPensionHint">A lump-sum bonus sacrifice reduces your taxable income and can help keep you clear of the £100,000 taper — the amount you direct into your pension isn't taxed as income now.</p>
+
+    <label for="incomeList" style="margin-top:2px;">Other income (other jobs, DB pensions, etc.)</label>
+    <div class="income-list" id="incomeList"></div>
+    <button type="button" class="add-income-btn" id="addIncomeBtn">+ Add another income</button>
+    <p class="hint">Enter the gross annual figure. If HMRC has put a D0, BR or similar flat-rate code on this source, that's just how it's taxed as you're paid — your true tax bill is still worked out on everything combined, which this tool already does, so you don't need to do anything extra for that.</p>
+
+    <label class="checkbox-row">
+      <input type="checkbox" id="otherIncomeIsEarnings" checked>
+      My other income is earnings, not a pension (subject to National Insurance)
+    </label>
+    <p class="hint" id="otherIncomeNiNote" style="margin-top:6px;margin-bottom:16px;">A defined benefit (DB) pension in payment is <strong>not</strong> subject to National Insurance or student loan deductions — untick this if your other income above is a pension.</p>
+
+    <label for="medicalInsurance">Private medical insurance (per month)</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="medicalInsurance" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <div class="total-line" style="margin-top:0;padding-top:0;border-top:none;">
+      <span>Annual equivalent</span>
+      <strong id="medicalInsuranceAnnualDisplay">£0</strong>
+    </div>
+    <p class="hint">Added to your gross pay and taxed directly, like ordinary income — not collected via a tax-code adjustment, so it doesn't change your tax code. It still isn't real cash though, so it's excluded from your take-home pay, and (like a DB pension) it's not subject to National Insurance.</p>
+
+    <div class="total-line">
+      <span>Total income (all sources)</span>
+      <strong id="totalSalaryDisplay">£0</strong>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" id="scottish">
+      I'm a Scottish taxpayer (adds an "S" prefix to the code)
+    </label>
+  </div>
+
+  <div class="result-card">
+    <p class="result-label">Estimated take-home pay</p>
+    <div class="freq-toggle" id="freqToggle">
+      <button type="button" id="freqBtnAnnual" data-freq="annual" class="active">Annual</button>
+      <button type="button" id="freqBtnMonth" data-freq="month">Monthly</button>
+      <button type="button" id="freqBtnWeek" data-freq="week">Weekly</button>
+    </div>
+    <p class="result-code" id="resultTakeHome">£0</p>
+    <p class="result-note" id="takeHomeNote">Enter your income above to get started.</p>
+
+    <div class="breakdown">
+      <div class="breakdown-col">
+        <div class="breakdown-item">
+          <div class="k">Gross salary</div>
+          <div class="v" id="bGross">£0</div>
+        </div>
+        <div class="breakdown-item" id="bStandardSalaryRow">
+          <div class="k">Standard salary take-home</div>
+          <div class="v accent" id="bStandardSalaryTakeHome">£0</div>
+          <div class="v-sub" id="bStandardSalaryGross">of £0 gross</div>
+        </div>
+        <div class="breakdown-item" id="bOvertimeRow">
+          <div class="k">Overtime take-home</div>
+          <div class="v accent" id="bOvertimeTakeHome">£0</div>
+          <div class="v-sub" id="bOvertimeGross">of £0 gross</div>
+        </div>
+        <div class="breakdown-item" id="bBonusRow">
+          <div class="k">Bonus take-home</div>
+          <div class="v accent" id="bBonusTakeHome">£0</div>
+          <div class="v-sub" id="bBonusGross">of £0 gross</div>
+        </div>
+        <div class="breakdown-item" id="bOtherIncomeRow">
+          <div class="k">Other income take-home</div>
+          <div class="v accent" id="bOtherIncomeTakeHome">£0</div>
+          <div class="v-sub" id="bOtherIncomeGross">of £0 gross</div>
+        </div>
+      </div>
+      <div class="breakdown-col">
+        <div class="breakdown-item">
+          <div class="k">Pension contributions</div>
+          <div class="v neg" id="bPensionDeduction">−£0</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="k">Income Tax</div>
+          <div class="v neg" id="bIncomeTax">−£0</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="k">National Insurance</div>
+          <div class="v neg" id="bNI">−£0</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="k">Student loan</div>
+          <div class="v neg" id="bStudentLoan">−£0</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="k">Tax code applied</div>
+          <div class="v accent" id="bTaxCodeMini">1257L</div>
+        </div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:10px;">Per-income take-home figures apply your overall average tax/NI rate to each income source — they add up to the total take-home above.</p>
+    <div class="takehome-badges">
+      <span class="takehome-badge">Monthly: <strong id="badgeMonthly">£0</strong></span>
+      <span class="takehome-badge">Weekly: <strong id="badgeWeekly">£0</strong></span>
+    </div>
+  </div>
+  </div>
+
+  <div class="input-grid">
+  <div class="card">
+    <h2><span class="dot" style="background:var(--accent-2);"></span>Student loan</h2>
+    <p class="hint">An undergraduate plan and a postgraduate loan can both apply to the same person at once.</p>
+    <div class="row2">
+      <div>
+        <label for="slPlan">Undergraduate plan</label>
+        <select id="slPlan">
+          <option value="none">None</option>
+          <option value="plan1">Plan 1</option>
+          <option value="plan2">Plan 2</option>
+          <option value="plan4">Plan 4 (Scotland)</option>
+          <option value="plan5">Plan 5</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <label class="checkbox-row" style="margin-top:0;">
+          <input type="checkbox" id="pgLoan">
+          Postgraduate loan
+        </label>
+      </div>
+    </div>
+    <p class="hint" id="studentLoanInfo" style="margin-bottom:0;">No student loan plan selected.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--warn);"></span>Benefits in kind</h2>
+    <p class="hint">Everything HMRC would otherwise ask you to guess from a P11D — items collected by adjusting your tax code, not added to your payslip's gross pay.</p>
+
+    <label for="p11d">Other P11D benefits</label>
+    <div class="field has-prefix">
+      <span class="prefix">£</span>
+      <input type="text" id="p11d" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <p class="hint">Company car and anything else with a cash-equivalent value on your P11D that HMRC collects by adjusting your tax code — excluding a loan, which is handled below. Your medical insurance has its own box in the Income card, since it's added to your gross pay and taxed directly instead.</p>
+
+    <label class="checkbox-row">
+      <input type="checkbox" id="hasLoan">
+      I have a cheap or interest-free loan from my employer
+    </label>
+
+    <div class="loan-panel" id="loanPanel" hidden>
+      <div class="row2">
+        <div>
+          <label for="loanBalance">Loan balance</label>
+          <div class="field has-prefix">
+            <span class="prefix">£</span>
+            <input type="text" id="loanBalance" inputmode="numeric" value="20,000" autocomplete="off">
+          </div>
+        </div>
+        <div>
+          <label for="officialRate">Official rate of interest</label>
+          <div class="field has-suffix">
+            <input type="text" id="officialRate" inputmode="decimal" value="3.75" autocomplete="off">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+      </div>
+
+      <details class="advanced">
+        <summary>Advanced: interest you already pay</summary>
+        <div class="advanced-body">
+          <label for="interestPaid">Interest rate you pay on the loan</label>
+          <div class="field has-suffix" style="margin-bottom:6px;">
+            <input type="text" id="interestPaid" inputmode="decimal" value="0" autocomplete="off">
+            <span class="suffix">%</span>
+          </div>
+          <p class="hint" style="margin-bottom:0;">Only the shortfall between the official rate and what you actually pay counts as a benefit.</p>
+        </div>
+      </details>
+
+      <div class="loan-result">
+        <span>Loan benefit added to P11D</span>
+        <strong id="loanBenefitDisplay">£750</strong>
+      </div>
+      <p class="hint" id="loanExemptNote" style="display:none;margin-bottom:0;">Loans of £10,000 or less at all times in the year are exempt — no benefit arises, so this loan adds £0.</p>
+    </div>
+
+    <div class="total-line">
+      <span>Total P11D benefits</span>
+      <strong id="totalP11dDisplay">£0</strong>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot" style="background:var(--danger);"></span>Tax code adjustments</h2>
+    <p class="hint">The other items HMRC folds into your tax code — enter the exact figures shown on your coding notice or in the "Check your Income Tax" section of the HMRC app. Those are already the allowance-adjustment amounts, not raw amounts of tax owed, so this tool just adds and subtracts them directly rather than converting them again.</p>
+
+    <label for="professionalSubs">Professional subscriptions</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="professionalSubs" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <p class="hint">Approved professional body fees and similar allowable expenses — unlike everything else on this card, this <strong>adds</strong> to your tax-free allowance rather than reducing it.</p>
+
+    <label for="underpayment">Underpayment from a previous year</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="underpayment" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+
+    <label for="rateBandAdjustment">Adjustment to rate band</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="rateBandAdjustment" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+
+    <label for="estimatedTaxOwed">Estimated tax you owe this year</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="estimatedTaxOwed" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <p class="hint" id="underpaymentInfo" style="margin-bottom:16px;">No charges entered.</p>
+
+    <label for="otherWorkItems">Other items from work</label>
+    <div class="field has-prefix" style="margin-bottom:6px;">
+      <span class="prefix">£</span>
+      <input type="text" id="otherWorkItems" inputmode="numeric" value="0" autocomplete="off">
+    </div>
+    <p class="hint" style="margin-bottom:0;">Anything else HMRC has added to your tax code that isn't covered elsewhere — treated the same way as a P11D benefit.</p>
+  </div>
+  </div>
+
+  <details class="card">
+    <summary style="cursor:pointer;font-weight:700;color:var(--accent);list-style:none;">▸ How your tax code was worked out</summary>
+    <div style="padding-top:14px;">
+    <p class="result-note" id="resultNote" style="text-align:left;max-width:none;margin-bottom:14px;">No taper applied — your income is under £100,000.</p>
+    <div class="breakdown">
+      <div class="breakdown-item">
+        <div class="k">Adjusted net income</div>
+        <div class="v" id="bAni">£0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Standard personal allowance</div>
+        <div class="v">£12,570</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Taper reduction (over £100k)</div>
+        <div class="v" id="bTaper">−£0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Allowance after taper</div>
+        <div class="v" id="bPaAfter">£12,570</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Less: P11D benefits &amp; other work items</div>
+        <div class="v neg" id="bBik">−£0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Plus: professional subscriptions</div>
+        <div class="v" id="bProfessionalSubs">£0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Less: underpayment &amp; other charges</div>
+        <div class="v neg" id="bDebt">−£0</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Tax-free amount → code</div>
+        <div class="v accent" id="bFree">£12,570</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="k">Resulting tax code</div>
+        <div class="v accent" id="resultCode">1257L</div>
+      </div>
+    </div>
+    </div>
+  </details>
+
+  <div class="card chart-card">
+    <h2><span class="dot" style="background:var(--accent-2);"></span>How your code falls as income rises</h2>
+    <p class="hint">Holding your total P11D benefits fixed, across £70,000–£140,000 of combined income.</p>
+    <div class="chart-wrap">
+      <svg class="chart-svg" id="chart" viewBox="0 0 680 320" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="chart-legend">
+      <span class="item"><span class="swatch line"></span> Tax code value</span>
+      <span class="item"><span class="swatch band"></span> Personal allowance taper zone (£100,000–£125,140 adjusted net income)</span>
+    </div>
+
+    <details class="advanced">
+      <summary>View as table</summary>
+      <div class="advanced-body table-scroll">
+        <table class="datatable" id="dataTable">
+          <thead>
+            <tr><th>Total salary</th><th>Adj. net income</th><th>Allowance after taper</th><th>Tax code</th></tr>
+          </thead>
+          <tbody id="dataTableBody"></tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>How this is worked out</h2>
+    <div class="explainer">
+      <p>All of your income streams are added together, because HMRC's personal allowance taper looks at your total <strong>adjusted net income</strong> — salary from every job or pension, plus taxable benefits, minus gross pension contributions and Gift Aid. The code below reflects that combined total, but in practice only <strong>one</strong> of your jobs (usually your main one) is actually given a personal-allowance code; HMRC typically taxes the others at a flat rate instead, such as <code>BR</code>, <code>D0</code>, or <code>D1</code>, with no allowance of their own.</p>
+      <p>Once adjusted net income passes <strong>£100,000</strong>, the standard £12,570 Personal Allowance is cut by £1 for every £2 over that line, reaching zero at <strong>£125,140</strong>.</p>
+      <p>Benefits reported on a <strong>P11D</strong> are taxable but usually aren't taxed through your payslip as you earn them, so HMRC collects that tax by deducting the P11D value from your tax-free amount instead. A <strong>beneficial loan</strong> works the same way: if your employer charges you less than HMRC's official rate of interest, the shortfall — loan balance × (official rate − rate you pay) — is itself a P11D benefit. Loans that never exceed £10,000 in the year are exempt entirely; above that, the whole balance counts, not just the excess. The official rate is set by HMRC and has moved before (it's been 3.75% since April 2025, though it can now change quarterly), so the field above is editable.</p>
+      <p>If you owe tax from an earlier year — the sort of thing that shows up on a <strong>P800</strong> or a <strong>Simple Assessment</strong> — or HMRC is adjusting your code for other reasons, these show up on your coding notice or in the "Check your Income Tax" section of the HMRC app as an <strong>underpayment</strong>, an <strong>adjustment to rate band</strong>, or an <strong>estimated amount you owe this year</strong>. HMRC has already worked out how much allowance each of these is worth by the time it shows you the figure, so the tax code adjustments card on this page takes the numbers exactly as shown there and subtracts them directly from your tax-free amount, the same way a P11D benefit is — no further conversion needed. <strong>Professional subscriptions</strong> work the other way round: approved professional body fees are a tax-deductible expense, so they <em>add</em> to your allowance instead of reducing it. In practice HMRC also caps how much can be "coded out" this way — broadly no more than 50% of your pay in any pay period, and Simple Assessment debts over £3,000 usually can't be coded out at all — limits this tool doesn't apply.</p>
+      <p>Whatever tax-free amount is left, divided by 10 and rounded down, becomes the number in your code, with <code>L</code> for the standard allowance. If benefits or charges use up the entire allowance, the code switches to <code>0T</code> (no free pay) or a <code>K</code> code, which adds notional income to what's taxed rather than giving any tax-free amount at all.</p>
+      <p>This is an estimate assuming no marriage allowance, blind person's allowance, or other adjustments not covered above — your actual coding notice from HMRC is the final word.</p>
+    </div>
+  </div>
+
+  <footer>Figures for the 2026/27 tax year: Personal Allowance £12,570, taper £100,000–£125,140, official rate of interest 3.75%, NI primary threshold £12,570 and upper earnings limit £50,270 (8%/2%), student loan thresholds Plan 1 £26,900, Plan 2 £29,385, Plan 4 £33,795, Plan 5 £25,000, Postgraduate £21,000 (9%/6%). Pension contributions here are assumed to be salary sacrifice, so they reduce pay for both Income Tax and National Insurance. Rates and thresholds are set by HMRC and can change — check gov.uk for the current position if you're relying on this for a decision. Illustrative only — not financial or tax advice. Nothing entered here is saved to your other trackers.</footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const STORAGE_KEY = 'taxcodeTracker.state.v1';
+
+  var STANDARD_PA = 12570;
+  var TAPER_START = 100000;
+  var TAPER_END = 125140; // 100000 + 12570*2
+  var SMALL_LOAN_EXEMPTION = 10000;
+  var MAX_INCOMES = 5;
+
+  // National Insurance (Class 1, employee) — 2026/27
+  var NI_PT = 12570;
+  var NI_UEL = 50270;
+  var NI_MAIN_RATE = 8;
+  var NI_UPPER_RATE = 2;
+
+  // Student / postgraduate loan thresholds (annual) — 2026/27
+  var SL_PLANS = { plan1: 26900, plan2: 29385, plan4: 33795, plan5: 25000 };
+  var PG_THRESHOLD = 21000;
+  var SL_RATE = 9;
+  var PG_RATE = 6;
+
+  // marginal-rate bands, expressed as cumulative taxable-income thresholds (post-allowance)
+  var BANDS_RUK = [
+    { limit: 37700, rate: 20 },
+    { limit: 125140, rate: 40 },
+    { limit: Infinity, rate: 45 }
+  ];
+  var BANDS_SCOTLAND = [
+    { limit: 3967, rate: 19 },
+    { limit: 16956, rate: 20 },
+    { limit: 31092, rate: 21 },
+    { limit: 62430, rate: 42 },
+    { limit: 125140, rate: 45 },
+    { limit: Infinity, rate: 48 }
+  ];
+  function marginalRateFor(taxableIncome, scottish){
+    var bands = scottish ? BANDS_SCOTLAND : BANDS_RUK;
+    for (var i = 0; i < bands.length; i++){
+      if (taxableIncome <= bands[i].limit) return bands[i].rate;
+    }
+    return bands[bands.length - 1].rate;
+  }
+
+  function calcPARaw(ani){
+    if (ani <= TAPER_START) return STANDARD_PA;
+    if (ani >= TAPER_END) return 0;
+    return STANDARD_PA - (ani - TAPER_START) / 2;
+  }
+  function calcPAFloored(ani){
+    if (ani <= TAPER_START) return STANDARD_PA;
+    if (ani >= TAPER_END) return 0;
+    var reduction = Math.floor((ani - TAPER_START) / 2);
+    return Math.max(0, STANDARD_PA - reduction);
+  }
+
+  // extraTaxable is income that's taxed like normal pay (it counts towards adjusted net income and
+  // the taper) but is added directly to gross pay rather than collected via a tax-code adjustment —
+  // e.g. a payrolled benefit such as medical insurance that's added to gross and taxed, rather than a
+  // P11D benefit that shows up as a deduction on the tax code itself. So it affects the taper/paAfter,
+  // but doesn't reduce taxFree (the code) the way p11d does.
+  function computeResult(salary, p11d, pension, underpayment, scottish, extraTaxable){
+    underpayment = underpayment || 0;
+    extraTaxable = extraTaxable || 0;
+    var ani = Math.max(0, salary + p11d + extraTaxable - pension);
+    var paAfter = calcPAFloored(ani);
+    var taperReduction = STANDARD_PA - paAfter;
+    var taxableIncome = Math.max(0, ani - paAfter);
+    var marginalRate = marginalRateFor(taxableIncome, scottish);
+    // 'underpayment' here is the combined total of prior-year underpayment, adjustment to rate band and
+    // estimated tax owed this year. These are entered as the figures shown on HMRC's own tax code
+    // breakdown (coding notice / "Check your Income Tax" in the app), which are ALREADY expressed as
+    // allowance deductions — HMRC has done any marginal-rate conversion before showing you that number.
+    // So it's subtracted directly, the same way a P11D benefit is, rather than grossed up again here.
+    var debtRestriction = underpayment;
+    var taxFree = paAfter - p11d - debtRestriction;
+    var code, type, numberPart;
+    if (taxFree > 0){
+      numberPart = Math.floor(taxFree / 10);
+      code = numberPart + 'L';
+      type = 'L';
+    } else if (Math.round(taxFree) === 0){
+      code = '0T';
+      type = '0T';
+      numberPart = 0;
+    } else {
+      numberPart = Math.ceil(Math.abs(taxFree) / 10);
+      code = 'K' + numberPart;
+      type = 'K';
+    }
+    return {
+      ani: ani, paAfter: paAfter, taperReduction: taperReduction, taxableIncome: taxableIncome,
+      marginalRate: marginalRate, debtRestriction: debtRestriction, taxFree: taxFree, code: code, type: type
+    };
+  }
+
+  function loanBenefit(loanBalance, officialRatePct, interestPaidPct){
+    if (loanBalance <= SMALL_LOAN_EXEMPTION) return 0;
+    var netRate = Math.max(0, officialRatePct - interestPaidPct);
+    return loanBalance * netRate / 100;
+  }
+
+  // Full band-by-band Income Tax due on taxable pay (after personal allowance / tax code
+  // free-pay amount has already been deducted, and can itself be negative for K codes,
+  // which is handled by the caller adding the notional K amount back into taxable pay).
+  function incomeTaxDue(taxableIncome, scottish){
+    taxableIncome = Math.max(0, taxableIncome);
+    var bands = scottish ? BANDS_SCOTLAND : BANDS_RUK;
+    var tax = 0, lower = 0;
+    for (var i = 0; i < bands.length; i++){
+      var upper = bands[i].limit;
+      if (taxableIncome <= lower) break;
+      var sliceTop = Math.min(taxableIncome, upper);
+      tax += Math.max(0, sliceTop - lower) * bands[i].rate / 100;
+      lower = upper;
+      if (taxableIncome <= upper) break;
+    }
+    return tax;
+  }
+
+  // Class 1 employee National Insurance on NI-able pay (gross minus salary-sacrifice pension;
+  // P11D benefits are not NI-able for the employee, so they're excluded by the caller).
+  function niDue(niablePay){
+    niablePay = Math.max(0, niablePay);
+    var mainSlice = Math.max(0, Math.min(niablePay, NI_UEL) - NI_PT);
+    var upperSlice = Math.max(0, niablePay - NI_UEL);
+    return mainSlice * NI_MAIN_RATE / 100 + upperSlice * NI_UPPER_RATE / 100;
+  }
+
+  // Student / postgraduate loan repayments — both can apply at once and stack.
+  function studentLoanDue(payBasis, plan, hasPg){
+    payBasis = Math.max(0, payBasis);
+    var total = 0;
+    if (plan && SL_PLANS[plan]){
+      total += Math.max(0, payBasis - SL_PLANS[plan]) * SL_RATE / 100;
+    }
+    if (hasPg){
+      total += Math.max(0, payBasis - PG_THRESHOLD) * PG_RATE / 100;
+    }
+    return total;
+  }
+
+  function parseNum(str){
+    var n = parseInt(String(str).replace(/[^0-9-]/g, ''), 10);
+    return isNaN(n) ? 0 : Math.max(0, n);
+  }
+  function parseDec(str){
+    var n = parseFloat(String(str).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? 0 : Math.max(0, n);
+  }
+  function fmtInt(n){
+    return Math.round(n).toLocaleString('en-GB');
+  }
+  function fmtMoney(n){
+    var r = Math.round(n);
+    return (r < 0 ? '−£' + fmtInt(Math.abs(r)) : '£' + fmtInt(r));
+  }
+
+  function downloadJSON(filename, obj){
+    const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  let lastResults = {};
+  let cloudCheckDone = false; // gates CloudSync.push() until the initial cloud check has resolved
+  let freq = 'annual'; // 'annual' | 'month' | 'week' — which frequency the hero figure is shown at
+  var FREQ_DIVISOR = { annual: 1, month: 12, week: 52 };
+
+  var freqButtons = { annual: $('freqBtnAnnual'), month: $('freqBtnMonth'), week: $('freqBtnWeek') };
+
+  function setFreq(f){
+    if (!FREQ_DIVISOR.hasOwnProperty(f)) f = 'annual';
+    freq = f;
+    Object.keys(freqButtons).forEach(function(key){
+      if (freqButtons[key]) freqButtons[key].classList.toggle('active', key === freq);
+    });
+  }
+
+  Object.keys(freqButtons).forEach(function(key){
+    if (freqButtons[key]){
+      freqButtons[key].addEventListener('click', function(){
+        setFreq(key);
+        compute();
+      });
+    }
+  });
+
+  // ---- income rows ----
+  var incomeList = $('incomeList');
+  var addIncomeBtn = $('addIncomeBtn');
+
+  function wireMoneyInput(inp){
+    inp.addEventListener('focus', function(){
+      var n = parseNum(this.value);
+      this.value = n === 0 ? '' : String(n);
+    });
+    inp.addEventListener('blur', function(){
+      this.value = fmtInt(parseNum(this.value));
+      compute();
+    });
+    inp.addEventListener('input', compute);
+  }
+  function wireDecimalInput(inp){
+    inp.addEventListener('focus', function(){
+      var n = parseDec(this.value);
+      this.value = n === 0 ? '' : String(n);
+    });
+    inp.addEventListener('blur', function(){
+      this.value = String(parseDec(this.value));
+      compute();
+    });
+    inp.addEventListener('input', compute);
+  }
+
+  function refreshIncomeRowChrome(){
+    var rows = incomeList.querySelectorAll('.income-row');
+    rows.forEach(function(row, i){
+      var input = row.querySelector('.income-input');
+      input.setAttribute('aria-label', 'Income ' + (i + 1));
+      var removeBtn = row.querySelector('.remove-income-btn');
+      removeBtn.classList.toggle('hidden', rows.length <= 1);
+    });
+    addIncomeBtn.classList.toggle('hidden', rows.length >= MAX_INCOMES);
+  }
+
+  function createIncomeRowEl(value){
+    var row = document.createElement('div');
+    row.className = 'income-row';
+
+    var field = document.createElement('div');
+    field.className = 'field has-prefix';
+    field.style.marginBottom = '0';
+
+    var prefix = document.createElement('span');
+    prefix.className = 'prefix';
+    prefix.textContent = '£';
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'income-input';
+    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('autocomplete', 'off');
+    input.value = fmtInt(value || 0);
+
+    field.appendChild(prefix);
+    field.appendChild(input);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-income-btn';
+    removeBtn.setAttribute('aria-label', 'Remove this income');
+    removeBtn.textContent = '×';
+
+    row.appendChild(field);
+    row.appendChild(removeBtn);
+
+    wireMoneyInput(input);
+    removeBtn.addEventListener('click', function(){
+      incomeList.removeChild(row);
+      refreshIncomeRowChrome();
+      compute();
+    });
+    return row;
+  }
+
+  function renderIncomeRows(values){
+    incomeList.innerHTML = '';
+    var use = (values && values.length) ? values.slice(0, MAX_INCOMES) : [0];
+    use.forEach(function(v){ incomeList.appendChild(createIncomeRowEl(v)); });
+    refreshIncomeRowChrome();
+  }
+
+  addIncomeBtn.addEventListener('click', function(){
+    var rows = incomeList.querySelectorAll('.income-row');
+    if (rows.length >= MAX_INCOMES) return;
+    incomeList.appendChild(createIncomeRowEl(0));
+    refreshIncomeRowChrome();
+    compute();
+  });
+
+  function totalSalary(){
+    var total = 0;
+    incomeList.querySelectorAll('.income-input').forEach(function(inp){
+      total += parseNum(inp.value);
+    });
+    return total;
+  }
+
+  // ---- main salary: standard salary + non-pensionable overtime % + pension % slider ----
+  var standardSalaryInput = $('standardSalary');
+  var overtimePctInput = $('overtimePct');
+  var pensionSlider = $('pensionSlider');
+  var bonusInput = $('bonus');
+  var bonusPensionInput = $('bonusPension');
+
+  wireMoneyInput(standardSalaryInput);
+  wireDecimalInput(overtimePctInput);
+  pensionSlider.addEventListener('input', compute);
+  wireMoneyInput(bonusInput);
+  wireMoneyInput(bonusPensionInput);
+
+  // ---- benefits in kind ----
+  var medicalInsuranceInput = $('medicalInsurance');
+  var p11dInput = $('p11d');
+  var scottishBox = $('scottish');
+  var hasLoanBox = $('hasLoan');
+  var loanPanel = $('loanPanel');
+  var loanBalanceInput = $('loanBalance');
+  var officialRateInput = $('officialRate');
+  var interestPaidInput = $('interestPaid');
+  var underpaymentInput = $('underpayment');
+  var professionalSubsInput = $('professionalSubs');
+  var rateBandAdjustmentInput = $('rateBandAdjustment');
+  var estimatedTaxOwedInput = $('estimatedTaxOwed');
+  var otherWorkItemsInput = $('otherWorkItems');
+  var slPlanInput = $('slPlan');
+  var pgLoanBox = $('pgLoan');
+  var otherIncomeIsEarningsBox = $('otherIncomeIsEarnings');
+
+  wireMoneyInput(medicalInsuranceInput);
+  wireMoneyInput(p11dInput);
+  wireMoneyInput(underpaymentInput);
+  wireMoneyInput(professionalSubsInput);
+  wireMoneyInput(rateBandAdjustmentInput);
+  wireMoneyInput(estimatedTaxOwedInput);
+  wireMoneyInput(otherWorkItemsInput);
+  wireMoneyInput(loanBalanceInput);
+  wireDecimalInput(officialRateInput);
+  wireDecimalInput(interestPaidInput);
+  scottishBox.addEventListener('change', compute);
+  hasLoanBox.addEventListener('change', function(){
+    loanPanel.hidden = !this.checked;
+    compute();
+  });
+  slPlanInput.addEventListener('change', compute);
+  pgLoanBox.addEventListener('change', compute);
+  otherIncomeIsEarningsBox.addEventListener('change', compute);
+
+  function currentInputs(){
+    var standardSalary = parseNum(standardSalaryInput.value);
+    var overtimePct = parseDec(overtimePctInput.value);
+    var overtimeAmount = standardSalary * overtimePct / 100; // not pensionable
+    var otherIncomes = totalSalary(); // sum of the "other income" rows only
+    var otherIncomeIsEarnings = otherIncomeIsEarningsBox.checked; // unticked = a pension: no NI or student loan
+    var bonus = parseNum(bonusInput.value); // one-off payment, still earnings (NI/student loan apply)
+    var bonusPensionRaw = parseNum(bonusPensionInput.value);
+    var bonusPension = Math.min(Math.max(0, bonusPensionRaw), bonus); // can't sacrifice more of the bonus than you were paid
+    var salary = standardSalary + overtimeAmount + otherIncomes + bonus;
+    var pensionPct = parseFloat(pensionSlider.value) || 0;
+    var pensionFromSalary = standardSalary * pensionPct / 100; // salary-sacrifice: % of standard salary only, not overtime or other income
+    var pension = pensionFromSalary + bonusPension; // total pension contributions for the year
+
+    var medicalInsuranceMonthly = parseNum(medicalInsuranceInput.value);
+    var medicalInsuranceAnnual = medicalInsuranceMonthly * 12;
+    var otherP11d = parseNum(p11dInput.value);
+    var otherWorkItems = parseNum(otherWorkItemsInput.value);
+    var professionalSubs = parseNum(professionalSubsInput.value);
+    var loanP11d = 0;
+    var loanBalance = 0, officialRate = 0, interestPaid = 0, loanExempt = false;
+    if (hasLoanBox.checked){
+      loanBalance = parseNum(loanBalanceInput.value);
+      officialRate = parseDec(officialRateInput.value);
+      interestPaid = parseDec(interestPaidInput.value);
+      loanP11d = loanBenefit(loanBalance, officialRate, interestPaid);
+      loanExempt = loanBalance > 0 && loanBalance <= SMALL_LOAN_EXEMPTION;
+    }
+    // "Debt-style" charges HMRC collects by shrinking the tax-free amount. Entered as the figures shown
+    // on HMRC's own tax code breakdown, which are already allowance-equivalent amounts — so, like a
+    // P11D benefit, these are subtracted directly rather than converted again.
+    var underpayment = parseNum(underpaymentInput.value);
+    var rateBandAdjustment = parseNum(rateBandAdjustmentInput.value);
+    var estimatedTaxOwed = parseNum(estimatedTaxOwedInput.value);
+    var totalCharges = underpayment + rateBandAdjustment + estimatedTaxOwed;
+    return {
+      standardSalary: standardSalary,
+      overtimePct: overtimePct,
+      overtimeAmount: overtimeAmount,
+      otherIncomes: otherIncomes,
+      otherIncomeIsEarnings: otherIncomeIsEarnings,
+      bonus: bonus,
+      bonusPension: bonusPension,
+      salary: salary,
+      pensionPct: pensionPct,
+      pensionFromSalary: pensionFromSalary,
+      medicalInsuranceMonthly: medicalInsuranceMonthly,
+      medicalInsuranceAnnual: medicalInsuranceAnnual,
+      otherP11d: otherP11d,
+      otherWorkItems: otherWorkItems,
+      professionalSubs: professionalSubs,
+      loanP11d: loanP11d,
+      loanExempt: loanExempt,
+      // professional subscriptions ADD to the tax-free allowance (negative p11d), everything else here
+      // is a benefit-style item that reduces it pound-for-pound, same as a P11D benefit
+      p11d: otherP11d + loanP11d + otherWorkItems - professionalSubs,
+      pension: pension,
+      underpayment: underpayment,
+      rateBandAdjustment: rateBandAdjustment,
+      estimatedTaxOwed: estimatedTaxOwed,
+      totalCharges: totalCharges,
+      scottish: scottishBox.checked,
+      slPlan: slPlanInput.value,
+      pgLoan: pgLoanBox.checked
+    };
+  }
+
+  function displayCode(code, scottish){
+    return scottish ? 'S' + code : code;
+  }
+
+  // ---------- persistence ----------
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+
+  function buildState(){
+    var incomes = [];
+    incomeList.querySelectorAll('.income-input').forEach(function(inp){ incomes.push(parseNum(inp.value)); });
+    return {
+      incomes: incomes,
+      standardSalary: parseNum(standardSalaryInput.value),
+      overtimePct: parseDec(overtimePctInput.value),
+      pensionPct: parseFloat(pensionSlider.value) || 0,
+      bonus: parseNum(bonusInput.value),
+      bonusPension: parseNum(bonusPensionInput.value),
+      medicalInsurance: parseNum(medicalInsuranceInput.value),
+      p11d: parseNum(p11dInput.value),
+      scottish: scottishBox.checked,
+      hasLoan: hasLoanBox.checked,
+      loanBalance: parseNum(loanBalanceInput.value),
+      officialRate: parseDec(officialRateInput.value),
+      interestPaid: parseDec(interestPaidInput.value),
+      underpayment: parseNum(underpaymentInput.value),
+      professionalSubs: parseNum(professionalSubsInput.value),
+      rateBandAdjustment: parseNum(rateBandAdjustmentInput.value),
+      estimatedTaxOwed: parseNum(estimatedTaxOwedInput.value),
+      otherWorkItems: parseNum(otherWorkItemsInput.value),
+      slPlan: slPlanInput.value,
+      pgLoan: pgLoanBox.checked,
+      otherIncomeIsEarnings: otherIncomeIsEarningsBox.checked,
+      freq: freq
+    };
+  }
+
+  function applyState(saved){
+    var incomes = (saved && Array.isArray(saved.incomes) && saved.incomes.length) ? saved.incomes : [0];
+    renderIncomeRows(incomes);
+    standardSalaryInput.value = fmtInt((saved && saved.standardSalary) || 0);
+    overtimePctInput.value = String((saved && saved.overtimePct != null) ? saved.overtimePct : 8.1);
+    pensionSlider.value = String((saved && saved.pensionPct != null) ? saved.pensionPct : 5);
+    bonusInput.value = fmtInt((saved && saved.bonus) || 0);
+    bonusPensionInput.value = fmtInt((saved && saved.bonusPension) || 0);
+    medicalInsuranceInput.value = fmtInt((saved && saved.medicalInsurance) || 0);
+    p11dInput.value = fmtInt((saved && saved.p11d) || 0);
+    scottishBox.checked = !!(saved && saved.scottish);
+    hasLoanBox.checked = !!(saved && saved.hasLoan);
+    loanPanel.hidden = !hasLoanBox.checked;
+    loanBalanceInput.value = fmtInt((saved && saved.loanBalance != null) ? saved.loanBalance : 20000);
+    officialRateInput.value = String((saved && saved.officialRate != null) ? saved.officialRate : 3.75);
+    interestPaidInput.value = String((saved && saved.interestPaid != null) ? saved.interestPaid : 0);
+    underpaymentInput.value = fmtInt((saved && saved.underpayment) || 0);
+    professionalSubsInput.value = fmtInt((saved && saved.professionalSubs) || 0);
+    rateBandAdjustmentInput.value = fmtInt((saved && saved.rateBandAdjustment) || 0);
+    estimatedTaxOwedInput.value = fmtInt((saved && saved.estimatedTaxOwed) || 0);
+    otherWorkItemsInput.value = fmtInt((saved && saved.otherWorkItems) || 0);
+    otherIncomeIsEarningsBox.checked = (saved && saved.otherIncomeIsEarnings != null) ? !!saved.otherIncomeIsEarnings : true;
+    slPlanInput.value = (saved && saved.slPlan) || 'none';
+    pgLoanBox.checked = !!(saved && saved.pgLoan);
+    setFreq((saved && saved.freq) || 'annual');
+  }
+
+  function saveNow(){
+    try{
+      const state = buildState();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if(window.CloudSync && cloudCheckDone){
+        CloudSync.push('taxcode', {
+          tracker: 'taxcode',
+          exportedAt: new Date().toISOString(),
+          ...lastResults,
+          state
+        });
+      }
+      const status = $('saveStatus');
+      if(status){
+        status.textContent = 'Saved just now in this browser.';
+        clearTimeout(saveNow._t);
+        saveNow._t = setTimeout(() => {
+          status.textContent = 'Your inputs are saved automatically in this browser.';
+        }, 1500);
+      }
+    }catch(e){ /* localStorage unavailable */ }
+  }
+
+  $('exportData').addEventListener('click', () => {
+    downloadJSON('taxcode-summary.json', {
+      tracker: 'taxcode',
+      exportedAt: new Date().toISOString(),
+      ...lastResults,
+      state: buildState()
+    });
+  });
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'taxcode'){
+          alert("That doesn't look like a summary file from this Tax Code tracker.");
+          return;
+        }
+        if(!parsed.state){
+          alert('This file was exported before cross-device import was added — please re-export it from the other device first.');
+          return;
+        }
+        applyState(parsed.state);
+        compute();
+      }catch(err){
+        alert('Could not read that file — make sure it\'s the JSON exported from this tracker.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  $('clearSaved').addEventListener('click', () => {
+    if(!confirm('Reset the tax code tracker to defaults? This clears all saved figures in this browser.')) return;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    applyState(null);
+    compute();
+  });
+
+  // Suggests how much more pension (as a % of standard salary) would clear the £100k-£125,140
+  // taper zone, where losing personal allowance on top of Income Tax creates an effective ~60%
+  // marginal rate. Returns {text, cls}.
+  function taperHint(inp, res){
+    var ani = res.ani;
+    if (ani <= TAPER_START){
+      return { text: 'You’re clear of the £100,000 taper zone — your full personal allowance applies.', cls: 'ok' };
+    }
+    var into = ani - TAPER_START;
+    var zoneNote = (ani >= TAPER_END)
+      ? 'Your personal allowance is fully gone due to the taper, so on top of Income Tax and NI, every extra £1 of income here still loses you allowance value indirectly.'
+      : '£' + fmtInt(into) + ' of your income is in the £100,000–£125,140 taper zone, where losing personal allowance on top of tax pushes your effective marginal rate to around 60%.';
+    if (inp.standardSalary <= 0){
+      return { text: zoneNote + ' Enter a standard salary to see how much pension contribution would clear it.', cls: 'warn' };
+    }
+    var extraPensionNeeded = Math.max(0, ani - TAPER_START);
+    var newPensionAmount = inp.pension + extraPensionNeeded;
+    var newPensionPct = newPensionAmount / inp.standardSalary * 100;
+    if (newPensionPct <= 100){
+      return {
+        text: zoneNote + ' Raising your pension contribution to about ' + newPensionPct.toFixed(1) + '% (£' + fmtInt(newPensionAmount) + '/year) would bring you back under £100,000 and restore your full allowance.',
+        cls: 'warn'
+      };
+    }
+    return { text: zoneNote + ' Clearing it with pension alone would need more than 100% of your standard salary — you’d need to reduce other income too.', cls: 'warn' };
+  }
+
+  // ---------- compute / render everything ----------
+  function compute(){
+    var inp = currentInputs();
+    var res = computeResult(inp.salary, inp.p11d, inp.pension, inp.totalCharges, inp.scottish, inp.medicalInsuranceAnnual);
+
+    $('medicalInsuranceAnnualDisplay').textContent = fmtMoney(inp.medicalInsuranceAnnual);
+    $('overtimeAmountDisplay').textContent = fmtMoney(inp.overtimeAmount);
+    $('pensionPctDisplay').textContent = inp.pensionPct.toFixed(1) + '%';
+    $('pensionAmountDisplay').textContent = fmtMoney(inp.pensionFromSalary) + '/year';
+    $('bonusCashDisplay').textContent = fmtMoney(Math.max(0, inp.bonus - inp.bonusPension));
+    var hint = taperHint(inp, res);
+    var hintEl = $('pensionTaperHint');
+    hintEl.textContent = hint.text;
+    hintEl.className = 'hint taper-hint ' + hint.cls;
+
+    $('totalSalaryDisplay').textContent = fmtMoney(inp.salary);
+    $('totalP11dDisplay').textContent = fmtMoney(inp.otherP11d + inp.loanP11d);
+
+    if (hasLoanBox.checked){
+      $('loanBenefitDisplay').textContent = fmtMoney(inp.loanP11d);
+      $('loanExemptNote').style.display = inp.loanExempt ? 'block' : 'none';
+    }
+
+    var debtInfoEl = $('underpaymentInfo');
+    if (inp.totalCharges > 0){
+      debtInfoEl.textContent = 'Together these reduce your tax-free amount by £' + fmtInt(inp.totalCharges) + ' — the same figures shown on your HMRC tax code breakdown, added up directly.';
+    } else {
+      debtInfoEl.textContent = 'No charges entered.';
+    }
+    $('bProfessionalSubs').textContent = inp.professionalSubs > 0 ? '£' + fmtInt(inp.professionalSubs) : '£0';
+
+    // ---- take-home pay (Income Tax + NI + student loan on top of the tax-code/taper math above) ----
+    // Income Tax applies to all cash income (standard salary, overtime, and other income, including a
+    // DB pension) minus the pension contribution. NI and student loan only apply to "earnings" — they're
+    // not due on pension income — so they use a narrower base when the "other income" isn't earnings.
+    var grossForTax = Math.max(0, inp.salary - inp.pension); // real cash pay only — medical insurance is never paid to you, so it's excluded here
+    // a bonus is earnings just like standard salary/overtime, so it's always subject to NI/student loan —
+    // unlike "other income", which can be a non-earnings pension via the checkbox above
+    var niEarnings = Math.max(0, inp.standardSalary + inp.overtimeAmount + inp.bonus + (inp.otherIncomeIsEarnings ? inp.otherIncomes : 0) - inp.pension);
+    // taxFree can be negative for K codes, adding notional income back in. medicalInsuranceAnnual is added
+    // on top here (rather than folded into taxFree) because it's taxed like ordinary payrolled income,
+    // not collected via a tax-code adjustment — so it doesn't change the code, just the tax bill.
+    var taxablePayForBands = Math.max(0, grossForTax - res.taxFree + inp.medicalInsuranceAnnual);
+    var incomeTax = incomeTaxDue(taxablePayForBands, inp.scottish);
+    var ni = niDue(niEarnings);
+    var studentLoan = studentLoanDue(niEarnings, inp.slPlan, inp.pgLoan);
+    var takeHomeAnnual = grossForTax - incomeTax - ni - studentLoan;
+
+    // ---- per-income take-home breakdown ----
+    // Split the overall take-home proportionally across each income source, using the single
+    // "effective rate" (take-home ÷ gross-for-tax) worked out above. This is an estimate — it assumes
+    // every pound is taxed at the same average rate — but the figures always add up exactly to the total
+    // take-home shown above, since standardSalaryNet + overtimeAmount + bonusNet + otherIncomes = grossForTax.
+    // Each income's own pension sacrifice (salary sacrifice for standard salary, the bonus lump sum for
+    // the bonus) is netted off against that source specifically, not lumped onto standard salary alone.
+    var standardSalaryNet = Math.max(0, inp.standardSalary - inp.pensionFromSalary);
+    var bonusNet = Math.max(0, inp.bonus - inp.bonusPension);
+    var effectiveRate = grossForTax > 0 ? (takeHomeAnnual / grossForTax) : 0;
+    var standardSalaryTakeHome = standardSalaryNet * effectiveRate;
+    var overtimeTakeHome = inp.overtimeAmount * effectiveRate;
+    var bonusTakeHome = bonusNet * effectiveRate;
+    var otherIncomeTakeHome = inp.otherIncomes * effectiveRate;
+
+    $('bGross').textContent = fmtMoney(inp.salary);
+    $('bStandardSalaryTakeHome').textContent = fmtMoney(standardSalaryTakeHome);
+    $('bStandardSalaryGross').textContent = 'of ' + fmtMoney(inp.standardSalary) + ' gross' + (inp.pensionFromSalary > 0 ? ' (before pension)' : '');
+
+    var overtimeRow = $('bOvertimeRow');
+    if (inp.overtimeAmount > 0){
+      overtimeRow.classList.remove('hidden');
+      $('bOvertimeTakeHome').textContent = fmtMoney(overtimeTakeHome);
+      $('bOvertimeGross').textContent = 'of ' + fmtMoney(inp.overtimeAmount) + ' gross';
+    } else {
+      overtimeRow.classList.add('hidden');
+    }
+
+    var bonusRow = $('bBonusRow');
+    if (inp.bonus > 0){
+      bonusRow.classList.remove('hidden');
+      $('bBonusTakeHome').textContent = fmtMoney(bonusTakeHome);
+      $('bBonusGross').textContent = 'of ' + fmtMoney(inp.bonus) + ' gross' + (inp.bonusPension > 0 ? ' (before pension)' : '');
+    } else {
+      bonusRow.classList.add('hidden');
+    }
+
+    var otherIncomeRow = $('bOtherIncomeRow');
+    if (inp.otherIncomes > 0){
+      otherIncomeRow.classList.remove('hidden');
+      $('bOtherIncomeTakeHome').textContent = fmtMoney(otherIncomeTakeHome);
+      $('bOtherIncomeGross').textContent = 'of ' + fmtMoney(inp.otherIncomes) + ' gross';
+    } else {
+      otherIncomeRow.classList.add('hidden');
+    }
+
+    $('bPensionDeduction').textContent = inp.pension > 0 ? '−£' + fmtInt(inp.pension) : '£0';
+    $('bIncomeTax').textContent = incomeTax > 0 ? '−£' + fmtInt(incomeTax) : '£0';
+    $('bNI').textContent = ni > 0 ? '−£' + fmtInt(ni) : '£0';
+    $('bStudentLoan').textContent = studentLoan > 0 ? '−£' + fmtInt(studentLoan) : '£0';
+
+    $('resultTakeHome').textContent = fmtMoney(takeHomeAnnual / FREQ_DIVISOR[freq]);
+    $('badgeMonthly').textContent = fmtMoney(takeHomeAnnual / 12);
+    $('badgeWeekly').textContent = fmtMoney(takeHomeAnnual / 52);
+
+    var takeHomeNoteEl = $('takeHomeNote');
+    if (inp.salary <= 0){
+      takeHomeNoteEl.textContent = 'Enter your income above to get started.';
+    } else {
+      takeHomeNoteEl.textContent = 'After Income Tax, National Insurance' + (studentLoan > 0 ? ' and student loan repayments' : '') + '.';
+    }
+
+    var slInfoEl = $('studentLoanInfo');
+    if (slInfoEl){
+      if (inp.slPlan === 'none' && !inp.pgLoan){
+        slInfoEl.textContent = 'No student loan plan selected.';
+      } else {
+        var bits = [];
+        if (inp.slPlan !== 'none'){ bits.push('undergraduate ' + inp.slPlan.replace('plan', 'Plan ')); }
+        if (inp.pgLoan){ bits.push('postgraduate loan'); }
+        slInfoEl.textContent = 'Repaying: ' + bits.join(' + ') + '. Estimated repayment: ' + fmtMoney(studentLoan) + '/year.';
+      }
+    }
+
+    var codeEl = $('resultCode');
+    codeEl.textContent = displayCode(res.code, inp.scottish);
+    codeEl.className = 'v ' + (res.type === 'K' ? 'neg' : 'accent');
+    $('bTaxCodeMini').textContent = displayCode(res.code, inp.scottish);
+
+    var noteEl = $('resultNote');
+    if (res.ani <= TAPER_START){
+      noteEl.textContent = 'No taper applied — your adjusted net income is at or under £100,000.';
+    } else if (res.ani >= TAPER_END){
+      noteEl.textContent = 'Your personal allowance is fully tapered away — none of your income is tax-free before P11D adjustments.';
+    } else {
+      noteEl.textContent = 'Your income is in the taper zone, so £' + fmtInt(res.taperReduction) + ' of allowance has already been lost.';
+    }
+
+    $('bAni').textContent = fmtMoney(res.ani);
+    $('bTaper').textContent = (res.taperReduction > 0 ? '−£' + fmtInt(res.taperReduction) : '£0');
+    $('bPaAfter').textContent = fmtMoney(res.paAfter);
+    var benefitsTotal = inp.otherP11d + inp.loanP11d + inp.otherWorkItems;
+    $('bBik').textContent = benefitsTotal > 0 ? '−£' + fmtInt(benefitsTotal) : '£0';
+    $('bDebt').textContent = res.debtRestriction > 0 ? '−£' + fmtInt(res.debtRestriction) : '£0';
+    var freeEl = $('bFree');
+    freeEl.textContent = (res.taxFree < 0 ? '−£' + fmtInt(Math.abs(res.taxFree)) : '£' + fmtInt(res.taxFree));
+    freeEl.className = 'v ' + (res.taxFree < 0 ? 'neg' : 'accent');
+
+    drawChart(inp, res);
+    fillTable(inp, res);
+
+    lastResults = {
+      code: displayCode(res.code, inp.scottish),
+      standardSalary: inp.standardSalary,
+      overtimePct: inp.overtimePct,
+      overtimeAmount: inp.overtimeAmount,
+      otherIncomes: inp.otherIncomes,
+      otherIncomeIsEarnings: inp.otherIncomeIsEarnings,
+      pensionPct: inp.pensionPct,
+      pensionAmount: inp.pension,
+      medicalInsuranceMonthly: inp.medicalInsuranceMonthly,
+      medicalInsuranceAnnual: inp.medicalInsuranceAnnual,
+      totalSalary: inp.salary,
+      totalP11d: inp.p11d,
+      adjustedNetIncome: res.ani,
+      allowanceAfterTaper: res.paAfter,
+      taxFreeAmount: res.taxFree,
+      marginalRatePct: res.marginalRate,
+      underpayment: inp.underpayment,
+      professionalSubs: inp.professionalSubs,
+      rateBandAdjustment: inp.rateBandAdjustment,
+      estimatedTaxOwed: inp.estimatedTaxOwed,
+      otherWorkItems: inp.otherWorkItems,
+      totalCharges: inp.totalCharges,
+      incomeTax: incomeTax,
+      nationalInsurance: ni,
+      studentLoan: studentLoan,
+      takeHomeAnnual: takeHomeAnnual,
+      takeHomeMonthly: takeHomeAnnual / 12,
+      takeHomeWeekly: takeHomeAnnual / 52
+    };
+
+    saveNow();
+  }
+
+  function codeValueAt(salary, p11d, pension, underpayment, scottish, extraTaxable){
+    // continuous (unfloored) tax-code-equivalent value, for a smooth curve
+    extraTaxable = extraTaxable || 0;
+    var ani = Math.max(0, salary + p11d + extraTaxable - pension);
+    var paRaw = calcPARaw(ani);
+    var debtRestriction = underpayment; // already an allowance-equivalent figure, see computeResult()
+    return (paRaw - p11d - debtRestriction) / 10;
+  }
+
+  function drawChart(inp, res){
+    var svg = $('chart');
+    var W = 680, H = 320;
+    var margin = { top: 16, right: 20, bottom: 34, left: 54 };
+    var plotW = W - margin.left - margin.right;
+    var plotH = H - margin.top - margin.bottom;
+
+    var xMin = 70000, xMax = 140000;
+    var samples = [];
+    var steps = 140;
+    for (var i = 0; i <= steps; i++){
+      var s = xMin + (xMax - xMin) * (i / steps);
+      samples.push({ s: s, v: codeValueAt(s, inp.p11d, inp.pension, inp.totalCharges, inp.scottish, inp.medicalInsuranceAnnual) });
+    }
+    var yVals = samples.map(function(p){ return p.v; });
+    var currentV = codeValueAt(inp.salary, inp.p11d, inp.pension, inp.totalCharges, inp.scottish, inp.medicalInsuranceAnnual);
+    yVals.push(currentV, 0);
+    var yMin = Math.min.apply(null, yVals);
+    var yMax = Math.max.apply(null, yVals);
+    var pad = (yMax - yMin) * 0.12 || 50;
+    yMin -= pad; yMax += pad;
+
+    function xPix(s){ return margin.left + (s - xMin) / (xMax - xMin) * plotW; }
+    function yPix(v){ return margin.top + (1 - (v - yMin) / (yMax - yMin)) * plotH; }
+
+    var parts = [];
+
+    // gridlines (y)
+    var yTicks = 4;
+    for (var t = 0; t <= yTicks; t++){
+      var v = yMin + (yMax - yMin) * (t / yTicks);
+      var yy = yPix(v);
+      parts.push('<line class="grid-line" x1="' + margin.left + '" x2="' + (W - margin.right) + '" y1="' + yy + '" y2="' + yy + '"/>');
+      var label;
+      if (Math.abs(v) < 1) label = '0T';
+      else if (v < 0) label = 'K' + Math.round(Math.abs(v));
+      else label = Math.round(v) + 'L';
+      parts.push('<text class="axis-label" x="' + (margin.left - 10) + '" y="' + (yy + 3) + '" text-anchor="end">' + label + '</text>');
+    }
+
+    // zero line if in range
+    if (yMin < 0 && yMax > 0){
+      var y0 = yPix(0);
+      parts.push('<line class="zero-line" x1="' + margin.left + '" x2="' + (W - margin.right) + '" y1="' + y0 + '" y2="' + y0 + '"/>');
+    }
+
+    // x ticks
+    var xTicks = [70000, 100000, 125140, 140000];
+    xTicks.forEach(function(xt){
+      var xx = xPix(xt);
+      var lbl = xt === 125140 ? '£125,140' : '£' + Math.round(xt/1000) + 'k';
+      parts.push('<text class="axis-label" x="' + xx + '" y="' + (H - margin.bottom + 18) + '" text-anchor="middle">' + lbl + '</text>');
+    });
+
+    // taper band
+    var bandStart = TAPER_START - inp.p11d - inp.medicalInsuranceAnnual + inp.pension;
+    var bandEnd = TAPER_END - inp.p11d - inp.medicalInsuranceAnnual + inp.pension;
+    var bx1 = Math.max(xMin, Math.min(xMax, bandStart));
+    var bx2 = Math.max(xMin, Math.min(xMax, bandEnd));
+    if (bx2 > bx1){
+      parts.push('<rect class="taper-band" x="' + xPix(bx1) + '" y="' + margin.top + '" width="' + (xPix(bx2) - xPix(bx1)) + '" height="' + plotH + '"/>');
+    }
+
+    // curve line + fill
+    var linePts = samples.map(function(p){ return xPix(p.s) + ',' + yPix(p.v); }).join(' L ');
+    var d = 'M ' + linePts;
+    var fillD = d + ' L ' + xPix(xMax) + ',' + yPix(yMin) + ' L ' + xPix(xMin) + ',' + yPix(yMin) + ' Z';
+    parts.push('<path class="curve-fill" d="' + fillD + '"/>');
+    parts.push('<path class="curve-line" d="' + d + '"/>');
+
+    // current marker
+    var mx = xPix(Math.max(xMin, Math.min(xMax, inp.salary)));
+    var my = yPix(Math.max(yMin, Math.min(yMax, currentV)));
+    parts.push('<line class="marker-line" x1="' + mx + '" x2="' + mx + '" y1="' + margin.top + '" y2="' + (H - margin.bottom) + '"/>');
+    parts.push('<circle class="marker-dot' + (res.type === 'K' ? ' k-marker' : '') + '" cx="' + mx + '" cy="' + my + '" r="6"/>');
+
+    svg.innerHTML = parts.join('');
+  }
+
+  function fillTable(inp, res){
+    var tbody = $('dataTableBody');
+    var rows = [];
+    var steps = [70000, 80000, 90000, 100000, 105000, 110000, 115000, 120000, 125140, 130000, 140000];
+    var closest = steps.reduce(function(best, cand){
+      return Math.abs(cand - inp.salary) < Math.abs(best - inp.salary) ? cand : best;
+    });
+    steps.forEach(function(s){
+      var r = computeResult(s, inp.p11d, inp.pension, inp.totalCharges, inp.scottish, inp.medicalInsuranceAnnual);
+      rows.push('<tr' + (s === closest ? ' class="current-row"' : '') + '>' +
+        '<td>£' + fmtInt(s) + '</td>' +
+        '<td>£' + fmtInt(r.ani) + '</td>' +
+        '<td>£' + fmtInt(r.paAfter) + '</td>' +
+        '<td>' + displayCode(r.code, inp.scottish) + '</td>' +
+        '</tr>');
+    });
+    tbody.innerHTML = rows.join('');
+  }
+
+  // ---------- init ----------
+  applyState(loadSaved());
+  compute();
+
+  if(window.CloudSync){
+    CloudSync.onAuthChange(function(user){
+      if(user){
+        CloudSync.pull('taxcode').then(function(cloudSummary){
+          if(cloudSummary && cloudSummary.state){ applyState(cloudSummary.state); }
+          cloudCheckDone = true;
+          compute();
+        });
+      } else {
+        cloudCheckDone = true;
+      }
+    });
+  } else {
+    cloudCheckDone = true;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Year-by-Year</title>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="sync.js"></script>
+<style>
+  :root{
+    --bg:#0f1420;
+    --panel:#161d2e;
+    --panel-2:#1c2540;
+    --border:#2b3358;
+    --text:#eaeefb;
+    --muted:#9aa3c7;
+    --accent:#f2b84b;
+    --accent-2:#7c8cff;
+    --good:#2fd6a7;
+    --warn:#ffb454;
+    --danger:#ff6b6b;
+    --savings:#ff8fa3;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 10% -10%, #1c2547 0%, var(--bg) 55%);
+    color:var(--text);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1240px;margin:0 auto;}
+  header{margin-bottom:20px;}
+  .back-link{
+    display:inline-flex;align-items:center;gap:6px;
+    color:var(--muted);text-decoration:none;font-size:0.85rem;margin-bottom:14px;
+  }
+  .back-link:hover{color:var(--accent);}
+  header h1{font-size:1.5rem;margin:0 0 4px;display:flex;align-items:center;gap:10px;}
+  header p{color:var(--muted);margin:0;font-size:0.9rem;max-width:70ch;}
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px;margin-bottom:18px;
+  }
+  .card h2{font-size:1rem;margin:0 0 10px;display:flex;align-items:center;gap:8px;}
+  .card h2 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .hint{color:var(--muted);font-size:0.82rem;margin:0 0 14px;}
+  .file-btn{
+    display:inline-flex;align-items:center;gap:6px;background:var(--panel-2);
+    border:1px solid var(--border);color:var(--text);padding:9px 14px;border-radius:9px;
+    font-size:0.85rem;cursor:pointer;
+  }
+  .file-btn:hover{border-color:var(--accent);}
+  .file-btn input{display:none;}
+  .btn{
+    background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:9px 14px;border-radius:9px;font-size:0.85rem;cursor:pointer;
+  }
+  .btn:hover{border-color:var(--accent);}
+  .status-line{color:var(--muted);font-size:0.8rem;margin-top:10px;}
+  .status-line.ok{color:var(--good);}
+  .status-line.err{color:var(--danger);}
+  .empty-note{color:var(--muted);font-size:0.9rem;padding:30px 10px;text-align:center;}
+
+  .yby-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+  .yby-title{font-size:1.15rem;font-weight:700;margin:0;}
+  .yby-sub{color:var(--muted);font-size:0.8rem;margin:2px 0 0;}
+  .tab-toggle{display:inline-flex;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;}
+  .tab-toggle button{
+    background:transparent;border:none;color:var(--muted);font-size:0.82rem;font-weight:600;
+    padding:7px 14px;border-radius:7px;cursor:pointer;
+  }
+  .tab-toggle button.active{background:var(--accent);color:#241a06;}
+
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:12px;}
+  table.yby-table{width:100%;border-collapse:collapse;font-size:0.85rem;min-width:920px;}
+  table.yby-table thead th{
+    position:sticky;top:0;background:var(--panel-2);color:var(--muted);text-transform:uppercase;
+    letter-spacing:0.03em;font-size:0.68rem;font-weight:700;text-align:left;padding:10px 12px;
+    border-bottom:1px solid var(--border);white-space:nowrap;
+  }
+  table.yby-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap;}
+  table.yby-table tbody tr.data-row:hover{background:var(--panel-2);}
+  table.yby-table tbody tr.data-row.retire-row{background:rgba(47,214,167,0.08);}
+  .age-num{font-weight:700;font-size:0.92rem;}
+  .age-phase{display:block;color:var(--muted);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.03em;margin-top:1px;}
+  .cell-main{font-variant-numeric:tabular-nums;}
+  .cell-sub{display:block;color:var(--muted);font-size:0.7rem;margin-top:2px;font-variant-numeric:tabular-nums;white-space:normal;}
+  .pos{color:var(--good);}
+  .neg{color:var(--danger);}
+  .dim{color:var(--muted);}
+
+  .milestone-row td{
+    background:rgba(124,140,255,0.10);border-bottom:1px solid var(--border);
+    border-left:3px solid var(--accent-2);padding:9px 12px;white-space:normal;
+  }
+  .milestone-line{display:flex;align-items:baseline;gap:6px;font-size:0.8rem;color:var(--accent-2);font-weight:600;}
+  .milestone-line + .milestone-line{margin-top:3px;color:var(--text);font-weight:400;}
+  .milestone-line .flag{font-size:0.85rem;}
+  .milestone-detail{color:var(--muted);font-weight:400;}
+
+  footer{text-align:center;color:var(--muted);font-size:0.78rem;margin-top:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="index.html" class="back-link">← Back to dashboard</a>
+    <h1>📅 Year-by-Year</h1>
+    <p>A single combined view of your saving years and retirement drawdown, side by side — pulled from your Retirement Planner's medium-growth scenario, with milestones flagged along the way.</p>
+  </header>
+
+  <div class="card">
+    <h2><span class="dot"></span>Data source</h2>
+    <p class="hint">Export a summary from the Retirement Planner (its "⬇ Export summary" button) and import it here. This view is read-only — it never edits your retirement planner.</p>
+    <label class="file-btn">⬆ Import retirement planner export<input type="file" id="importData" accept=".json" hidden></label>
+    <button class="btn" id="clearData" type="button" style="margin-left:8px;">Clear</button>
+    <div class="status-line" id="statusLine">No data loaded yet.</div>
+  </div>
+
+  <div class="card" id="tableCard" style="display:none;">
+    <div class="yby-header">
+      <div>
+        <p class="yby-title">Year-by-Year</p>
+        <p class="yby-sub" id="tableSub">Nominal figures — not adjusted for inflation.</p>
+      </div>
+      <div class="tab-toggle" id="tabToggle">
+        <button type="button" id="tabBtnAll" class="active">All Years</button>
+        <button type="button" id="tabBtnSaving">Saving</button>
+        <button type="button" id="tabBtnRetirement">Retirement</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="yby-table">
+        <thead>
+          <tr>
+            <th>Age</th>
+            <th>Liquid Pot</th>
+            <th>Growth</th>
+            <th>In / Out</th>
+            <th>Income</th>
+            <th>Tax</th>
+            <th>Net</th>
+            <th>Target</th>
+            <th>Savings</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="taxCaveat" style="margin-top:12px;margin-bottom:0;">Tax and Net columns are an estimate only — standard UK income-tax bands applied to each year's taxable retirement income (DB pension, State Pension, and taxable pot withdrawals). They don't account for Scottish rates, the personal allowance taper, or income from outside your retirement planner.</p>
+  </div>
+
+  <footer>Illustrative only — not financial advice. Figures come entirely from your Retirement Planner's own medium-growth scenario at the time you last exported it; re-export and re-import here to refresh.</footer>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'yearByYearViewer.lastImport.v1';
+  const $ = id => document.getElementById(id);
+
+  function gbp(n){
+    const v = Math.round(n || 0);
+    const sign = v < 0 ? '−' : '';
+    return sign + '£' + Math.abs(v).toLocaleString('en-GB');
+  }
+  function signedGbp(n){
+    const v = Math.round(n || 0);
+    if(v > 0) return '+' + gbp(v);
+    if(v < 0) return gbp(v);
+    return gbp(0);
+  }
+
+  let currentData = null; // the full imported/pulled JSON (tracker export shape)
+  let currentTab = 'all';
+
+  function loadSaved(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function saveData(parsed){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed)); }catch(e){ /* unavailable */ }
+  }
+
+  function setStatus(text, cls){
+    const el = $('statusLine');
+    el.textContent = text;
+    el.className = 'status-line' + (cls ? ' ' + cls : '');
+  }
+
+  function liquidSubtext(row){
+    const bits = [`DC ${gbp(row.dcPot)}`];
+    if(row.savingsAmt) bits.push(`${gbp(row.savingsAmt)} savings`);
+    if(row.isaAmt) bits.push(`${gbp(row.isaAmt)} ISA`);
+    return bits.join(' + ');
+  }
+
+  function incomeCell(row){
+    if(row.income == null) return '<span class="dim">−</span>';
+    const parts = [];
+    if(row.incomeBreakdown){
+      if(row.incomeBreakdown.db) parts.push(`DB ${gbp(row.incomeBreakdown.db)}`);
+      if(row.incomeBreakdown.sp) parts.push(`SP ${gbp(row.incomeBreakdown.sp)}`);
+      if(row.incomeBreakdown.other) parts.push(`Other ${gbp(row.incomeBreakdown.other)}`);
+    }
+    return `<span class="cell-main">${gbp(row.income)}</span>` + (parts.length ? `<span class="cell-sub">${parts.join(' · ')}</span>` : '');
+  }
+
+  function rowHtml(row, isFirstRetireRow){
+    const phaseLabel = row.phase === 'saving' ? 'Saving' : (isFirstRetireRow ? 'Retire' : 'Drawing');
+    const rowCls = 'data-row' + (isFirstRetireRow ? ' retire-row' : '');
+    const inOutCls = row.inOut > 0 ? 'pos' : (row.inOut < 0 ? 'neg' : 'dim');
+    return `<tr class="${rowCls}">
+      <td><span class="age-num">${row.age}</span><span class="age-phase">${phaseLabel}</span></td>
+      <td><span class="cell-main">${gbp(row.liquidPot)}</span><span class="cell-sub">${liquidSubtext(row)}</span></td>
+      <td class="${row.growth >= 0 ? 'pos' : 'neg'}">${signedGbp(row.growth)}</td>
+      <td class="${inOutCls}">${signedGbp(row.inOut)}<span class="cell-sub dim">${row.inOutLabel || ''}</span></td>
+      <td>${incomeCell(row)}</td>
+      <td>${row.tax == null ? '<span class="dim">−</span>' : (row.tax < 0 ? `<span class="neg">${gbp(row.tax)}</span>` : gbp(row.tax))}</td>
+      <td>${row.net == null ? '<span class="dim">−</span>' : gbp(row.net)}</td>
+      <td>${row.target == null ? '<span class="dim">−</span>' : gbp(row.target)}</td>
+      <td>${gbp(row.savingsColumn)}</td>
+    </tr>`;
+  }
+
+  function milestoneRowHtml(group){
+    const lines = group.map(m => `<div class="milestone-line"><span class="flag">🚩</span><span>${m.label}</span>${m.detail ? `<span class="milestone-detail">${m.detail}</span>` : ''}</div>`).join('');
+    return `<tr class="milestone-row"><td colspan="9">${lines}</td></tr>`;
+  }
+
+  function renderTable(){
+    const yby = currentData && currentData.yearByYear;
+    if(!yby || !Array.isArray(yby.rows)){
+      $('tableCard').style.display = 'none';
+      return;
+    }
+    $('tableCard').style.display = 'block';
+
+    const rows = yby.rows.filter(r => currentTab === 'all' ? true : r.phase === currentTab);
+    const firstRetireAge = yby.rows.find(r => r.phase === 'retirement');
+    const firstRetireAgeVal = firstRetireAge ? firstRetireAge.age : null;
+
+    // group milestones by age so simultaneous events (e.g. retiring the same year a DB pension
+    // starts) render as one flagged banner with multiple lines, like the reference tool
+    const milestonesByAge = {};
+    (yby.milestones || []).forEach(m => {
+      (milestonesByAge[m.age] = milestonesByAge[m.age] || []).push(m);
+    });
+    const usedAges = new Set();
+
+    let html = '';
+    rows.forEach(row => {
+      if(milestonesByAge[row.age] && !usedAges.has(row.age)){
+        html += milestoneRowHtml(milestonesByAge[row.age]);
+        usedAges.add(row.age);
+      }
+      html += rowHtml(row, row.phase === 'retirement' && row.age === firstRetireAgeVal);
+    });
+    $('tableBody').innerHTML = html || '<tr><td colspan="9" class="empty-note">No years in this range.</td></tr>';
+  }
+
+  function applyData(parsed, sourceLabel){
+    currentData = parsed;
+    saveData(parsed);
+    const yby = parsed.yearByYear;
+    if(!yby || !Array.isArray(yby.rows) || yby.rows.length === 0){
+      setStatus('That export doesn\'t have a Year-by-Year table in it yet — re-export from an up-to-date copy of the Retirement Planner.', 'err');
+      $('tableCard').style.display = 'none';
+      return;
+    }
+    const savingCount = yby.rows.filter(r => r.phase === 'saving').length;
+    const retireCount = yby.rows.filter(r => r.phase === 'retirement').length;
+    setStatus(`${sourceLabel} — ${savingCount} saving year${savingCount === 1 ? '' : 's'}, ${retireCount} retirement year${retireCount === 1 ? '' : 's'}, ${(yby.milestones || []).length} milestone${(yby.milestones || []).length === 1 ? '' : 's'}.`, 'ok');
+    renderTable();
+  }
+
+  $('importData').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(parsed.tracker !== 'retirement-planner'){
+          setStatus("That doesn't look like a summary file from the Retirement Planner.", 'err');
+          return;
+        }
+        applyData(parsed, `Imported ${file.name}`);
+      }catch(err){
+        setStatus("Could not read that file — make sure it's the JSON exported from the Retirement Planner.", 'err');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  $('clearData').addEventListener('click', () => {
+    if(!confirm('Clear the loaded Year-by-Year data from this page?')) return;
+    currentData = null;
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    $('tableCard').style.display = 'none';
+    setStatus('No data loaded yet.');
+  });
+
+  var tabButtons = { all: $('tabBtnAll'), saving: $('tabBtnSaving'), retirement: $('tabBtnRetirement') };
+  function setTab(tab){
+    currentTab = tab;
+    Object.keys(tabButtons).forEach(function(key){
+      if(tabButtons[key]) tabButtons[key].classList.toggle('active', key === tab);
+    });
+    renderTable();
+  }
+  Object.keys(tabButtons).forEach(function(key){
+    if(tabButtons[key]) tabButtons[key].addEventListener('click', function(){ setTab(key); });
+  });
+
+  // ---------- restore last import, and try a live pull if already signed in elsewhere ----------
+  const saved = loadSaved();
+  if(saved && saved.yearByYear){
+    applyData(saved, 'Loaded your last import');
+  } else {
+    setStatus('No data loaded yet.');
+  }
+
+  if(window.CloudSync){
+    CloudSync.onAuthChange(function(user){
+      if(!user) return;
+      CloudSync.pull('pension').then(function(summary){
+        if(summary && summary.yearByYear){
+          applyData(summary, 'Synced from your signed-in Retirement Planner');
+        }
+      }).catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
