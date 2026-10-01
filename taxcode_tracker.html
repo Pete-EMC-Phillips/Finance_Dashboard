@@ -135,6 +135,17 @@
   }
   .total-line strong{font-size:1rem;color:var(--text);}
 
+  .period-title{font-size:0.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin:0 0 10px;}
+  .period-box{padding:14px 14px 2px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,0.02);margin-bottom:16px;}
+  .period-box .slider-minmax{margin-bottom:12px;}
+  .period-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:4px;}
+  .period-stat{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+  .period-stat .k{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;}
+  .period-stat .v{font-size:1.35rem;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .period-stat .v-sub{font-size:0.75rem;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;}
+  table.datatable tr.bonus-row td:first-child::after{content:' · bonus';color:var(--muted);font-weight:400;}
+  table.datatable tr.change-row td{border-top:2px solid var(--accent);}
+  table.datatable tfoot td{font-weight:700;color:var(--text);border-bottom:none;}
   .loan-panel{margin-top:14px;padding:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;}
   .loan-panel .row2{margin-bottom:0;}
   .loan-result{
@@ -225,7 +236,7 @@
       </svg>
     </div>
     <h1>🧾 Take-Home Pay Calculator</h1>
-    <p>Enter your salary, overtime, and pension contribution — plus any other income, P11D benefits, prior-year underpayment or student loan — to see your real take-home pay, and use the pension slider to steer clear of the £100,000–£125,140 taper zone.</p>
+    <p>Enter your salary, overtime, and pension contribution (with any mid-year pay rise or pension change) — plus any other income, P11D benefits, prior-year underpayment or student loan — to see your real take-home pay, and use the pension slider to steer clear of the £100,000–£125,140 taper zone.</p>
   </header>
 
   <div class="save-note">
@@ -242,11 +253,60 @@
     <h2><span class="dot"></span>Income</h2>
     <p class="hint">Your main salary and overtime, plus any other income. Annual, before tax.</p>
 
-    <label for="standardSalary">Standard salary</label>
-    <div class="field has-prefix">
-      <span class="prefix">£</span>
-      <input type="text" id="standardSalary" inputmode="numeric" value="0" autocomplete="off">
+    <div class="period-box">
+      <p class="period-title" id="earlyTitle">Whole tax year — April to March</p>
+      <div class="row2">
+        <div>
+          <label for="earlySalary">Standard salary (annual)</label>
+          <div class="field has-prefix">
+            <span class="prefix">£</span>
+            <input type="text" id="earlySalary" inputmode="numeric" value="0" autocomplete="off">
+          </div>
+        </div>
+        <div>
+          <label for="earlyPensionPct">Pension contribution</label>
+          <div class="field has-suffix">
+            <input type="text" id="earlyPensionPct" inputmode="decimal" value="5" autocomplete="off">
+            <span class="suffix">%</span>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <label for="changeMonth">Pay rise or pension change from</label>
+    <div class="field">
+      <select id="changeMonth">
+        <option value="-1">No change yet this tax year</option>
+        <option value="1">May</option>
+        <option value="2">June</option>
+        <option value="3">July</option>
+        <option value="4">August</option>
+        <option value="5">September</option>
+        <option value="6">October</option>
+        <option value="7">November</option>
+        <option value="8">December</option>
+        <option value="9">January</option>
+        <option value="10">February</option>
+        <option value="11">March</option>
+      </select>
+    </div>
+
+    <div class="period-box" id="latePeriod" hidden>
+      <p class="period-title" id="lateTitle">Current part of the year</p>
+      <label for="standardSalary">Standard salary (annual, after the change)</label>
+      <div class="field has-prefix">
+        <span class="prefix">£</span>
+        <input type="text" id="standardSalary" inputmode="numeric" value="0" autocomplete="off">
+      </div>
+
+      <label for="pensionSlider">Pension contribution</label>
+      <div class="slider-row">
+        <input type="range" id="pensionSlider" min="0" max="60" step="0.5" value="5">
+        <span class="slider-val" id="pensionPctDisplay">5.0%</span>
+      </div>
+      <div class="slider-minmax"><span>£0/year</span><span id="pensionAmountDisplay">£0/year</span><span>60%</span></div>
+    </div>
+    <p class="hint" id="salaryYearNote">Salary paid this tax year: £0.</p>
 
     <div class="row2">
       <div>
@@ -266,18 +326,44 @@
     </div>
     <p class="hint">A flat % of your standard salary, paid every month on top of it — not pensionable.</p>
 
-    <label for="pensionSlider">Pension contribution</label>
-    <div class="slider-row">
-      <input type="range" id="pensionSlider" min="0" max="60" step="0.5" value="5">
-      <span class="slider-val" id="pensionPctDisplay">5.0%</span>
+    <label for="pensionType">How your pension is taken</label>
+    <div class="field" style="margin-bottom:6px;">
+      <select id="pensionType">
+        <option value="sacrifice">Salary sacrifice — cuts Income Tax and NI</option>
+        <option value="netpay">Net pay arrangement — cuts Income Tax only</option>
+      </select>
     </div>
-    <div class="slider-minmax"><span>£0/year</span><span id="pensionAmountDisplay">£0/year</span><span>60%</span></div>
+    <p class="hint">Check your payslip. If the pension comes off your pay but your NI is still worked out on the full salary, it's a <strong>net pay arrangement</strong>, which is common with public-sector and many workplace schemes. Picking the wrong one makes take-home look too high.</p>
+
     <p class="hint taper-hint ok" id="pensionTaperHint">Enter a salary above to see how the taper affects you.</p>
 
-    <label for="bonus">One-off bonus</label>
-    <div class="field has-prefix" style="margin-bottom:6px;">
-      <span class="prefix">£</span>
-      <input type="text" id="bonus" inputmode="numeric" value="0" autocomplete="off">
+    <div class="row2">
+      <div>
+        <label for="bonus">One-off bonus</label>
+        <div class="field has-prefix" style="margin-bottom:6px;">
+          <span class="prefix">£</span>
+          <input type="text" id="bonus" inputmode="numeric" value="0" autocomplete="off">
+        </div>
+      </div>
+      <div>
+        <label for="bonusMonth">Paid in</label>
+        <div class="field" style="margin-bottom:6px;">
+          <select id="bonusMonth">
+            <option value="0">April</option>
+            <option value="1">May</option>
+            <option value="2">June</option>
+            <option value="3">July</option>
+            <option value="4">August</option>
+            <option value="5">September</option>
+            <option value="6">October</option>
+            <option value="7">November</option>
+            <option value="8">December</option>
+            <option value="9">January</option>
+            <option value="10">February</option>
+            <option value="11">March</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <label for="bonusPension">Of which, paid into pension</label>
@@ -390,6 +476,21 @@
       <span class="takehome-badge">Weekly: <strong id="badgeWeekly">£0</strong></span>
     </div>
   </div>
+  </div>
+
+  <div class="card" style="margin-top:14px;">
+    <h2><span class="dot" style="background:var(--good);"></span>Take-home from your salary, month by month</h2>
+    <p class="hint">Worked out the way payroll does it: Income Tax on a cumulative basis using the tax code above, and NI and student loan month by month. Compare any row with that month's payslip. If a row doesn't match, the column that differs shows where the gap is.</p>
+    <div class="period-stats" id="periodStats"></div>
+    <div class="table-scroll">
+      <table class="datatable">
+        <thead>
+          <tr><th>Month</th><th>Gross pay</th><th>Pension</th><th>Income Tax</th><th>NI</th><th>Student loan</th><th>Take-home</th></tr>
+        </thead>
+        <tbody id="payrollBody"></tbody>
+        <tfoot id="payrollFoot"></tfoot>
+      </table>
+    </div>
   </div>
 
   <div class="input-grid">
@@ -589,6 +690,7 @@
     <h2><span class="dot"></span>How this is worked out</h2>
     <div class="explainer">
       <p>All of your income streams are added together, because HMRC's personal allowance taper looks at your total <strong>adjusted net income</strong> — salary from every job or pension, plus taxable benefits, minus gross pension contributions and Gift Aid. The code below reflects that combined total, but in practice only <strong>one</strong> of your jobs (usually your main one) is actually given a personal-allowance code; HMRC typically taxes the others at a flat rate instead, such as <code>BR</code>, <code>D0</code>, or <code>D1</code>, with no allowance of their own.</p>
+      <p>If your salary or pension contribution changed partway through the year, the start-of-year figures apply from April up to the month you pick, and the current figures apply from that month to March. The tax code is worked out on what you're actually paid across the whole year, and take-home is worked out month by month the way payroll does it. Income Tax is <strong>cumulative</strong>: each month, payroll compares your pay so far this year with the tax-free pay and bands for the year so far, so a pay rise is taxed correctly from the month it starts. National Insurance and student loan are worked out on each month's pay on its own.</p>
       <p>Once adjusted net income passes <strong>£100,000</strong>, the standard £12,570 Personal Allowance is cut by £1 for every £2 over that line, reaching zero at <strong>£125,140</strong>.</p>
       <p>Benefits reported on a <strong>P11D</strong> are taxable but usually aren't taxed through your payslip as you earn them, so HMRC collects that tax by deducting the P11D value from your tax-free amount instead. A <strong>beneficial loan</strong> works the same way: if your employer charges you less than HMRC's official rate of interest, the shortfall — loan balance × (official rate − rate you pay) — is itself a P11D benefit. Loans that never exceed £10,000 in the year are exempt entirely; above that, the whole balance counts, not just the excess. The official rate is set by HMRC and has moved before (it's been 3.75% since April 2025, though it can now change quarterly), so the field above is editable.</p>
       <p>If you owe tax from an earlier year — the sort of thing that shows up on a <strong>P800</strong> or a <strong>Simple Assessment</strong> — or HMRC is adjusting your code for other reasons, these show up on your coding notice or in the "Check your Income Tax" section of the HMRC app as an <strong>underpayment</strong>, an <strong>adjustment to rate band</strong>, or an <strong>estimated amount you owe this year</strong>. HMRC has already worked out how much allowance each of these is worth by the time it shows you the figure, so the tax code adjustments card on this page takes the numbers exactly as shown there and subtracts them directly from your tax-free amount, the same way a P11D benefit is — no further conversion needed. <strong>Professional subscriptions</strong> work the other way round: approved professional body fees are a tax-deductible expense, so they <em>add</em> to your allowance instead of reducing it. In practice HMRC also caps how much can be "coded out" this way — broadly no more than 50% of your pay in any pay period, and Simple Assessment debts over £3,000 usually can't be coded out at all — limits this tool doesn't apply.</p>
@@ -597,7 +699,7 @@
     </div>
   </div>
 
-  <footer>Figures for the 2026/27 tax year: Personal Allowance £12,570, taper £100,000–£125,140, official rate of interest 3.75%, NI primary threshold £12,570 and upper earnings limit £50,270 (8%/2%), student loan thresholds Plan 1 £26,900, Plan 2 £29,385, Plan 4 £33,795, Plan 5 £25,000, Postgraduate £21,000 (9%/6%). Pension contributions here are assumed to be salary sacrifice, so they reduce pay for both Income Tax and National Insurance. Rates and thresholds are set by HMRC and can change — check gov.uk for the current position if you're relying on this for a decision. Illustrative only — not financial or tax advice. Nothing entered here is saved to your other trackers.</footer>
+  <footer>Figures for the 2026/27 tax year: Income Tax 20% / 40% / 45% (the 45% additional rate applies to taxable income over £125,140; Scottish rates run from 19% to 48%), Personal Allowance £12,570, taper £100,000–£125,140, official rate of interest 3.75%, NI primary threshold £12,570 and upper earnings limit £50,270 (8%/2%), student loan thresholds Plan 1 £26,900, Plan 2 £29,385, Plan 4 £33,795, Plan 5 £25,000, Postgraduate £21,000 (9%/6%). Pension contributions reduce Income Tax either way; with salary sacrifice they reduce National Insurance and student loan too, and with a net pay arrangement they don't. Take-home is worked out month by month as payroll does it, with Income Tax on a cumulative basis. Rates and thresholds are set by HMRC and can change — check gov.uk for the current position if you're relying on this for a decision. Illustrative only — not financial or tax advice. Nothing entered here is saved to your other trackers.</footer>
 </div>
 
 <script>
@@ -706,12 +808,14 @@
   // Full band-by-band Income Tax due on taxable pay (after personal allowance / tax code
   // free-pay amount has already been deducted, and can itself be negative for K codes,
   // which is handled by the caller adding the notional K amount back into taxable pay).
-  function incomeTaxDue(taxableIncome, scottish){
+  // frac scales the bands for PAYE's cumulative basis — e.g. 5/12 for tax due on the first five months' pay.
+  function incomeTaxDue(taxableIncome, scottish, frac){
+    frac = frac || 1;
     taxableIncome = Math.max(0, taxableIncome);
     var bands = scottish ? BANDS_SCOTLAND : BANDS_RUK;
     var tax = 0, lower = 0;
     for (var i = 0; i < bands.length; i++){
-      var upper = bands[i].limit;
+      var upper = bands[i].limit * frac;
       if (taxableIncome <= lower) break;
       var sliceTop = Math.min(taxableIncome, upper);
       tax += Math.max(0, sliceTop - lower) * bands[i].rate / 100;
@@ -723,24 +827,67 @@
 
   // Class 1 employee National Insurance on NI-able pay (gross minus salary-sacrifice pension;
   // P11D benefits are not NI-able for the employee, so they're excluded by the caller).
-  function niDue(niablePay){
+  // frac scales the annual thresholds to the pay period (1/12 for a monthly payslip).
+  function niDue(niablePay, frac){
+    frac = frac || 1;
     niablePay = Math.max(0, niablePay);
-    var mainSlice = Math.max(0, Math.min(niablePay, NI_UEL) - NI_PT);
-    var upperSlice = Math.max(0, niablePay - NI_UEL);
+    var mainSlice = Math.max(0, Math.min(niablePay, NI_UEL * frac) - NI_PT * frac);
+    var upperSlice = Math.max(0, niablePay - NI_UEL * frac);
     return mainSlice * NI_MAIN_RATE / 100 + upperSlice * NI_UPPER_RATE / 100;
   }
 
   // Student / postgraduate loan repayments — both can apply at once and stack.
-  function studentLoanDue(payBasis, plan, hasPg){
+  function studentLoanDue(payBasis, plan, hasPg, frac){
+    frac = frac || 1;
     payBasis = Math.max(0, payBasis);
     var total = 0;
     if (plan && SL_PLANS[plan]){
-      total += Math.max(0, payBasis - SL_PLANS[plan]) * SL_RATE / 100;
+      total += Math.max(0, payBasis - SL_PLANS[plan] * frac) * SL_RATE / 100;
     }
     if (hasPg){
-      total += Math.max(0, payBasis - PG_THRESHOLD) * PG_RATE / 100;
+      total += Math.max(0, payBasis - PG_THRESHOLD * frac) * PG_RATE / 100;
     }
     return total;
+  }
+
+  var MONTHS = ['April','May','June','July','August','September','October','November','December','January','February','March'];
+
+  // Runs the tax year through payroll one month at a time, the way PAYE does: Income Tax is cumulative
+  // (year-to-date pay against year-to-date free pay and bands, so a mid-year pay rise is picked up
+  // correctly), while NI and student loan are worked out on each month's pay on its own.
+  function runPayroll(inp, taxFree){
+    var rows = [];
+    var totals = { gross: 0, pension: 0, tax: 0, ni: 0, sl: 0, takeHome: 0 };
+    var cumTaxable = 0, cumTax = 0;
+    for (var m = 0; m < 12; m++){
+      var late = inp.hasChange && m >= inp.changeMonth;
+      var salary = (late ? inp.lateSalary : inp.earlySalary) / 12;
+      var pensionPct = late ? inp.latePensionPct : inp.earlyPensionPct;
+      var overtime = salary * inp.overtimePct / 100;
+      var isBonusMonth = m === inp.bonusMonth && inp.bonus > 0;
+      var bonus = isBonusMonth ? inp.bonus : 0;
+      var other = inp.otherIncomes / 12;
+      var pension = salary * pensionPct / 100 + (isBonusMonth ? inp.bonusPension : 0);
+      var gross = salary + overtime + bonus + other;
+
+      // both salary sacrifice and a net pay arrangement come off before Income Tax
+      cumTaxable += gross - pension + inp.medicalInsuranceMonthly;
+      var frac = (m + 1) / 12;
+      var cumDue = incomeTaxDue(cumTaxable - taxFree * frac, inp.scottish, frac);
+      var tax = cumDue - cumTax;
+      cumTax = cumDue;
+
+      // only salary sacrifice also reduces the pay NI and student loan are worked out on
+      var niBase = salary + overtime + bonus + (inp.otherIncomeIsEarnings ? other : 0) - (inp.pensionType === 'sacrifice' ? pension : 0);
+      var ni = niDue(niBase, 1 / 12);
+      var sl = studentLoanDue(niBase, inp.slPlan, inp.pgLoan, 1 / 12);
+      var takeHome = gross - pension - tax - ni - sl;
+
+      rows.push({ month: m, late: late, isBonusMonth: isBonusMonth, gross: gross, pension: pension, tax: tax, ni: ni, sl: sl, takeHome: takeHome });
+      totals.gross += gross; totals.pension += pension; totals.tax += tax;
+      totals.ni += ni; totals.sl += sl; totals.takeHome += takeHome;
+    }
+    return { rows: rows, totals: totals };
   }
 
   function parseNum(str){
@@ -896,18 +1043,37 @@
     return total;
   }
 
-  // ---- main salary: standard salary + non-pensionable overtime % + pension % slider ----
-  var standardSalaryInput = $('standardSalary');
+  // ---- main salary: start-of-year salary + pension %, then optionally a pay rise / pension change from
+  // a chosen month (current salary + pension % slider), plus non-pensionable overtime % ----
+  var earlySalaryInput = $('earlySalary');
+  var earlyPensionPctInput = $('earlyPensionPct');
+  var changeMonthSelect = $('changeMonth');
+  var standardSalaryInput = $('standardSalary'); // the current (after-change) salary
   var overtimePctInput = $('overtimePct');
-  var pensionSlider = $('pensionSlider');
+  var pensionSlider = $('pensionSlider');        // the current (after-change) pension %
+  var pensionTypeSelect = $('pensionType');
   var bonusInput = $('bonus');
+  var bonusMonthSelect = $('bonusMonth');
   var bonusPensionInput = $('bonusPension');
 
+  wireMoneyInput(earlySalaryInput);
+  wireDecimalInput(earlyPensionPctInput);
   wireMoneyInput(standardSalaryInput);
   wireDecimalInput(overtimePctInput);
   pensionSlider.addEventListener('input', compute);
+  pensionTypeSelect.addEventListener('change', compute);
   wireMoneyInput(bonusInput);
+  bonusMonthSelect.addEventListener('change', compute);
   wireMoneyInput(bonusPensionInput);
+
+  changeMonthSelect.addEventListener('change', function(){
+    // first time a change is switched on, start the "current" figures from the start-of-year ones
+    if (parseInt(this.value, 10) > 0 && parseNum(standardSalaryInput.value) === 0){
+      standardSalaryInput.value = fmtInt(parseNum(earlySalaryInput.value));
+      pensionSlider.value = String(Math.min(60, parseDec(earlyPensionPctInput.value)));
+    }
+    compute();
+  });
 
   // ---- benefits in kind ----
   var medicalInsuranceInput = $('medicalInsurance');
@@ -947,7 +1113,17 @@
   otherIncomeIsEarningsBox.addEventListener('change', compute);
 
   function currentInputs(){
-    var standardSalary = parseNum(standardSalaryInput.value);
+    var changeMonth = parseInt(changeMonthSelect.value, 10);
+    var hasChange = changeMonth >= 1 && changeMonth <= 11;
+    var earlyMonths = hasChange ? changeMonth : 12;
+    var lateMonths = 12 - earlyMonths;
+    var earlySalary = parseNum(earlySalaryInput.value);
+    var earlyPensionPct = Math.min(100, parseDec(earlyPensionPctInput.value));
+    var lateSalary = hasChange ? parseNum(standardSalaryInput.value) : 0;
+    var latePensionPct = hasChange ? (parseFloat(pensionSlider.value) || 0) : 0;
+    // salary actually paid in this tax year — with no change yet, the tax code runs off the
+    // start-of-year figures alone; once a change month is set, it blends both parts of the year
+    var standardSalary = earlySalary * earlyMonths / 12 + lateSalary * lateMonths / 12;
     var overtimePct = parseDec(overtimePctInput.value);
     var overtimeAmount = standardSalary * overtimePct / 100; // not pensionable
     var otherIncomes = totalSalary(); // sum of the "other income" rows only
@@ -956,8 +1132,9 @@
     var bonusPensionRaw = parseNum(bonusPensionInput.value);
     var bonusPension = Math.min(Math.max(0, bonusPensionRaw), bonus); // can't sacrifice more of the bonus than you were paid
     var salary = standardSalary + overtimeAmount + otherIncomes + bonus;
-    var pensionPct = parseFloat(pensionSlider.value) || 0;
-    var pensionFromSalary = standardSalary * pensionPct / 100; // salary-sacrifice: % of standard salary only, not overtime or other income
+    // % of standard salary only, not overtime or other income, for each part of the year
+    var pensionFromSalary = earlySalary * earlyPensionPct / 100 * earlyMonths / 12 + lateSalary * latePensionPct / 100 * lateMonths / 12;
+    var pensionPct = standardSalary > 0 ? pensionFromSalary / standardSalary * 100 : 0; // year's effective average
     var pension = pensionFromSalary + bonusPension; // total pension contributions for the year
 
     var medicalInsuranceMonthly = parseNum(medicalInsuranceInput.value);
@@ -982,6 +1159,16 @@
     var estimatedTaxOwed = parseNum(estimatedTaxOwedInput.value);
     var totalCharges = underpayment + rateBandAdjustment + estimatedTaxOwed;
     return {
+      changeMonth: changeMonth,
+      hasChange: hasChange,
+      earlyMonths: earlyMonths,
+      lateMonths: lateMonths,
+      earlySalary: earlySalary,
+      earlyPensionPct: earlyPensionPct,
+      lateSalary: lateSalary,
+      latePensionPct: latePensionPct,
+      pensionType: pensionTypeSelect.value,
+      bonusMonth: parseInt(bonusMonthSelect.value, 10),
       standardSalary: standardSalary,
       overtimePct: overtimePct,
       overtimeAmount: overtimeAmount,
@@ -1030,10 +1217,15 @@
     incomeList.querySelectorAll('.income-input').forEach(function(inp){ incomes.push(parseNum(inp.value)); });
     return {
       incomes: incomes,
+      earlySalary: parseNum(earlySalaryInput.value),
+      earlyPensionPct: parseDec(earlyPensionPctInput.value),
+      changeMonth: parseInt(changeMonthSelect.value, 10),
       standardSalary: parseNum(standardSalaryInput.value),
       overtimePct: parseDec(overtimePctInput.value),
       pensionPct: parseFloat(pensionSlider.value) || 0,
+      pensionType: pensionTypeSelect.value,
       bonus: parseNum(bonusInput.value),
+      bonusMonth: parseInt(bonusMonthSelect.value, 10),
       bonusPension: parseNum(bonusPensionInput.value),
       medicalInsurance: parseNum(medicalInsuranceInput.value),
       p11d: parseNum(p11dInput.value),
@@ -1057,10 +1249,17 @@
   function applyState(saved){
     var incomes = (saved && Array.isArray(saved.incomes) && saved.incomes.length) ? saved.incomes : [0];
     renderIncomeRows(incomes);
+    // data saved before the pay-rise split had only one salary/pension — carry it over as the start-of-year figures
+    var hasSplit = !!(saved && saved.earlySalary != null);
+    earlySalaryInput.value = fmtInt(hasSplit ? saved.earlySalary : ((saved && saved.standardSalary) || 0));
+    earlyPensionPctInput.value = String(hasSplit ? (saved.earlyPensionPct || 0) : ((saved && saved.pensionPct != null) ? saved.pensionPct : 5));
+    changeMonthSelect.value = String((saved && saved.changeMonth >= 1 && saved.changeMonth <= 11) ? saved.changeMonth : -1);
     standardSalaryInput.value = fmtInt((saved && saved.standardSalary) || 0);
     overtimePctInput.value = String((saved && saved.overtimePct != null) ? saved.overtimePct : 8.1);
     pensionSlider.value = String((saved && saved.pensionPct != null) ? saved.pensionPct : 5);
+    pensionTypeSelect.value = (saved && saved.pensionType === 'netpay') ? 'netpay' : 'sacrifice';
     bonusInput.value = fmtInt((saved && saved.bonus) || 0);
+    bonusMonthSelect.value = String((saved && saved.bonusMonth >= 0 && saved.bonusMonth <= 11) ? saved.bonusMonth : 11);
     bonusPensionInput.value = fmtInt((saved && saved.bonusPension) || 0);
     medicalInsuranceInput.value = fmtInt((saved && saved.medicalInsurance) || 0);
     p11dInput.value = fmtInt((saved && saved.p11d) || 0);
@@ -1157,19 +1356,74 @@
     var zoneNote = (ani >= TAPER_END)
       ? 'Your personal allowance is fully gone due to the taper, so on top of Income Tax and NI, every extra £1 of income here still loses you allowance value indirectly.'
       : '£' + fmtInt(into) + ' of your income is in the £100,000–£125,140 taper zone, where losing personal allowance on top of tax pushes your effective marginal rate to around 60%.';
-    if (inp.standardSalary <= 0){
+    // only the pension % still to come can be changed — the current part of the year if there's been a change
+    var adjustableSalary = inp.hasChange ? inp.lateSalary * inp.lateMonths / 12 : inp.earlySalary;
+    var periodPension = inp.hasChange ? adjustableSalary * inp.latePensionPct / 100 : inp.earlySalary * inp.earlyPensionPct / 100;
+    if (adjustableSalary <= 0){
       return { text: zoneNote + ' Enter a standard salary to see how much pension contribution would clear it.', cls: 'warn' };
     }
     var extraPensionNeeded = Math.max(0, ani - TAPER_START);
-    var newPensionAmount = inp.pension + extraPensionNeeded;
-    var newPensionPct = newPensionAmount / inp.standardSalary * 100;
+    var newPensionAmount = periodPension + extraPensionNeeded;
+    var newPensionPct = newPensionAmount / adjustableSalary * 100;
     if (newPensionPct <= 100){
+      var which = inp.hasChange ? 'your pension contribution from ' + MONTHS[inp.changeMonth] : 'your pension contribution';
+      var period = inp.hasChange ? ' over ' + MONTHS[inp.changeMonth] + '–March' : '/year';
       return {
-        text: zoneNote + ' Raising your pension contribution to about ' + newPensionPct.toFixed(1) + '% (£' + fmtInt(newPensionAmount) + '/year) would bring you back under £100,000 and restore your full allowance.',
+        text: zoneNote + ' Raising ' + which + ' to about ' + newPensionPct.toFixed(1) + '% (£' + fmtInt(newPensionAmount) + period + ') would bring you back under £100,000 and restore your full allowance.',
         cls: 'warn'
       };
     }
     return { text: zoneNote + ' Clearing it with pension alone would need more than 100% of your standard salary — you’d need to reduce other income too.', cls: 'warn' };
+  }
+
+  // Per-period "typical month" tiles plus the 12-month payslip table.
+  function renderPayroll(inp, payroll){
+    function typicalMonth(from, to){
+      var months = payroll.rows.slice(from, to);
+      var regular = months.filter(function(r){ return !r.isBonusMonth; });
+      var use = regular.length ? regular : months;
+      var sum = use.reduce(function(a, r){ return a + r.takeHome; }, 0);
+      return use.length ? sum / use.length : 0;
+    }
+    function tile(label, value, sub){
+      return '<div class="period-stat"><div class="k">' + label + '</div><div class="v">' + fmtMoney(value) +
+        '<span style="font-size:0.8rem;color:var(--muted);font-weight:600;"> / month</span></div><div class="v-sub">' + sub + '</div></div>';
+    }
+    var tiles = [];
+    if (inp.hasChange){
+      tiles.push(tile('April – ' + MONTHS[inp.changeMonth - 1], typicalMonth(0, inp.changeMonth),
+        'on ' + fmtMoney(inp.earlySalary) + ' salary, ' + inp.earlyPensionPct + '% pension'));
+      tiles.push(tile(MONTHS[inp.changeMonth] + ' – March (current)', typicalMonth(inp.changeMonth, 12),
+        'on ' + fmtMoney(inp.lateSalary) + ' salary, ' + inp.latePensionPct + '% pension'));
+    } else {
+      tiles.push(tile('April – March', typicalMonth(0, 12),
+        'on ' + fmtMoney(inp.earlySalary) + ' salary, ' + inp.earlyPensionPct + '% pension'));
+    }
+    if (inp.bonus > 0){
+      var b = payroll.rows[inp.bonusMonth];
+      tiles.push(tile(MONTHS[inp.bonusMonth] + ' (bonus month)', b.takeHome, 'including ' + fmtMoney(inp.bonus) + ' bonus before tax'));
+    }
+    tiles.push(tile('Average over the year', payroll.totals.takeHome / 12, fmtMoney(payroll.totals.takeHome) + ' for the whole tax year'));
+    $('periodStats').innerHTML = tiles.join('');
+
+    function money(n){ return Math.abs(n) < 0.5 ? '£0' : fmtMoney(n); }
+    $('payrollBody').innerHTML = payroll.rows.map(function(r){
+      var cls = [];
+      if (r.isBonusMonth) cls.push('bonus-row');
+      if (inp.hasChange && r.month === inp.changeMonth) cls.push('change-row');
+      return '<tr' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' +
+        '<td>' + MONTHS[r.month] + '</td>' +
+        '<td>' + money(r.gross) + '</td>' +
+        '<td>' + money(r.pension) + '</td>' +
+        '<td>' + money(r.tax) + '</td>' +
+        '<td>' + money(r.ni) + '</td>' +
+        '<td>' + money(r.sl) + '</td>' +
+        '<td style="color:var(--accent);font-weight:700;">' + money(r.takeHome) + '</td>' +
+        '</tr>';
+    }).join('');
+    var t = payroll.totals;
+    $('payrollFoot').innerHTML = '<tr><td>Year</td><td>' + money(t.gross) + '</td><td>' + money(t.pension) + '</td><td>' +
+      money(t.tax) + '</td><td>' + money(t.ni) + '</td><td>' + money(t.sl) + '</td><td style="color:var(--accent);">' + money(t.takeHome) + '</td></tr>';
   }
 
   // ---------- compute / render everything ----------
@@ -1179,8 +1433,19 @@
 
     $('medicalInsuranceAnnualDisplay').textContent = fmtMoney(inp.medicalInsuranceAnnual);
     $('overtimeAmountDisplay').textContent = fmtMoney(inp.overtimeAmount);
-    $('pensionPctDisplay').textContent = inp.pensionPct.toFixed(1) + '%';
-    $('pensionAmountDisplay').textContent = fmtMoney(inp.pensionFromSalary) + '/year';
+    var sliderPct = parseFloat(pensionSlider.value) || 0;
+    $('pensionPctDisplay').textContent = sliderPct.toFixed(1) + '%';
+    $('pensionAmountDisplay').textContent = fmtMoney(parseNum(standardSalaryInput.value) * sliderPct / 100) + '/year';
+
+    $('latePeriod').hidden = !inp.hasChange;
+    if (inp.hasChange){
+      $('earlyTitle').textContent = 'Start of the tax year — April to ' + MONTHS[inp.changeMonth - 1] + ' (' + inp.earlyMonths + (inp.earlyMonths === 1 ? ' month)' : ' months)');
+      $('lateTitle').textContent = 'Current part of the year — ' + MONTHS[inp.changeMonth] + ' to March (' + inp.lateMonths + (inp.lateMonths === 1 ? ' month)' : ' months)');
+      $('salaryYearNote').textContent = 'Salary paid this tax year: ' + fmtMoney(inp.standardSalary) + ', made up of ' + inp.earlyMonths + ' × ' + fmtMoney(inp.earlySalary / 12) + ' plus ' + inp.lateMonths + ' × ' + fmtMoney(inp.lateSalary / 12) + ' a month. Pension from salary: ' + fmtMoney(inp.pensionFromSalary) + '. The tax code uses both parts of the year.';
+    } else {
+      $('earlyTitle').textContent = 'Whole tax year — April to March';
+      $('salaryYearNote').textContent = 'Salary paid this tax year: ' + fmtMoney(inp.standardSalary) + ', with ' + fmtMoney(inp.pensionFromSalary) + ' going into your pension. Pick a month above once you get a pay rise or change your pension.';
+    }
     $('bonusCashDisplay').textContent = fmtMoney(Math.max(0, inp.bonus - inp.bonusPension));
     var hint = taperHint(inp, res);
     var hintEl = $('pensionTaperHint');
@@ -1208,17 +1473,16 @@
     // DB pension) minus the pension contribution. NI and student loan only apply to "earnings" — they're
     // not due on pension income — so they use a narrower base when the "other income" isn't earnings.
     var grossForTax = Math.max(0, inp.salary - inp.pension); // real cash pay only — medical insurance is never paid to you, so it's excluded here
-    // a bonus is earnings just like standard salary/overtime, so it's always subject to NI/student loan —
-    // unlike "other income", which can be a non-earnings pension via the checkbox above
-    var niEarnings = Math.max(0, inp.standardSalary + inp.overtimeAmount + inp.bonus + (inp.otherIncomeIsEarnings ? inp.otherIncomes : 0) - inp.pension);
-    // taxFree can be negative for K codes, adding notional income back in. medicalInsuranceAnnual is added
-    // on top here (rather than folded into taxFree) because it's taxed like ordinary payrolled income,
-    // not collected via a tax-code adjustment — so it doesn't change the code, just the tax bill.
-    var taxablePayForBands = Math.max(0, grossForTax - res.taxFree + inp.medicalInsuranceAnnual);
-    var incomeTax = incomeTaxDue(taxablePayForBands, inp.scottish);
-    var ni = niDue(niEarnings);
-    var studentLoan = studentLoanDue(niEarnings, inp.slPlan, inp.pgLoan);
-    var takeHomeAnnual = grossForTax - incomeTax - ni - studentLoan;
+    // The year is run through payroll month by month (see runPayroll) so a mid-year pay rise or pension
+    // change, the month the bonus lands in, and the pension type (salary sacrifice vs net pay) are all
+    // reflected the way they would be on your payslips. taxFree can be negative for K codes; medical
+    // insurance is taxed as payrolled income, so it raises the tax bill without changing the code.
+    var payroll = runPayroll(inp, res.taxFree);
+    var incomeTax = payroll.totals.tax;
+    var ni = payroll.totals.ni;
+    var studentLoan = payroll.totals.sl;
+    var takeHomeAnnual = payroll.totals.takeHome;
+    renderPayroll(inp, payroll);
 
     // ---- per-income take-home breakdown ----
     // Split the overall take-home proportionally across each income source, using the single
@@ -1323,6 +1587,12 @@
 
     lastResults = {
       code: displayCode(res.code, inp.scottish),
+      earlySalary: inp.earlySalary,
+      earlyPensionPct: inp.earlyPensionPct,
+      changeMonth: inp.hasChange ? MONTHS[inp.changeMonth] : null,
+      currentSalary: inp.hasChange ? inp.lateSalary : inp.earlySalary,
+      currentPensionPct: inp.hasChange ? inp.latePensionPct : inp.earlyPensionPct,
+      pensionType: inp.pensionType,
       standardSalary: inp.standardSalary,
       overtimePct: inp.overtimePct,
       overtimeAmount: inp.overtimeAmount,
